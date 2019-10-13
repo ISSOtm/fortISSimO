@@ -165,6 +165,9 @@ hUGE_TickSound::
     ; Write 0 to NRx2 to kill the channel
     xor a
     ldh [c], a
+    dec hl ; Skip FX params
+    dec hl ; Skip FX buffer
+    ld [hl], 1
     ret
 
 .fx_callRoutine
@@ -180,11 +183,47 @@ hUGE_TickSound::
 
 .fx_volSlide
     ; Add a signed 5-bit offset to the current volume
-    ; TODO:
+    ld a, [hld] ; Get params
+    dec [hl]
+    ret nz
+    ; Reload counter
+    ld b, a
+    and %111
+    ld [hld], a
+    dec hl ; Skip FX number
+    ld a, [hl] ; Get current volume (low 4 bits reset)
+    rrca
+    add a, b ; Add signed 5-bit offset
+    and $F8 ; Clear low 3 bits so they don't interfere
+    add a, a
+    ; If result was negative (due to overflow), the FX is done
+    jr nc, hUGE_SetChannelVolume
+    inc hl ; Skip volume
+    ld [hl], 1
     ret
 
+    ; TODO: get rid of this
 .noMoreFX
-    ret
+    ld b, b
+
+; @param hl A pointer to the channel's volume byte
+; @param c The low byte of a pointer to NRx2
+; @param a The value to set the volume to, **MUST** have low 4 bits reset
+; @destroy b
+hUGE_SetChannelVolume:
+    ld [hld], a
+    bit 3, c ; Out of all NRx2, this is only set for NR32
+    jr z, .notCH3
+    and $C0 ; Keep only the upper 2 bits
+    ; Convert to NR32 encoding
+    ld b, a
+    rrca
+    xor b
+    ; Bit 7 will be ignored by the hardware
+.notCH3
+    ldh [c], a ; Write that to NRx2
+    set 7, [hl] ; Get the note to retrigger
+    jp hUGE_PlayNote ; Retrigger the note to take the volume change into account
 
 ; @param a The ID of the routine to call
 ; @param h Even on 1st call, odd on "updates", including during 1st tick!
@@ -376,8 +415,8 @@ hUGE_TickChannel:
     jr .noMoreFX
 
 .fx_volSlide
-    ; Schedule effect to happen on this tick
-    ld a, 1
+    ; Schedule effect to happen on next tick
+    ld a, 2
     jr .doneWithFX
 
 .fx_setVolume
@@ -477,7 +516,6 @@ hUGE_PlayNote:
     ld a, [whUGE_NRx4Mask]
     ldh [rNR44], a
     ret
-
 
 
 ; Loads an instrument into a channel's hardware regs
