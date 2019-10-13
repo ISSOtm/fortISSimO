@@ -98,16 +98,16 @@ hUGE_TickSound::
 
     ; Process effects "update"
     ld c, LOW(rNR43)
-    ld hl, whUGE_CH4FXParams
+    ld hl, whUGE_CH4FX
     call .fxUpdate
     ld c, LOW(rNR33)
-    ld hl, whUGE_CH3FXParams
+    ld hl, whUGE_CH3FX
     call .fxUpdate
     ld c, LOW(rNR23)
-    ld hl, whUGE_CH2FXParams
+    ld hl, whUGE_CH2FX
     call .fxUpdate
     ld c, LOW(rNR13)
-    ld hl, whUGE_CH1FXParams
+    ld hl, whUGE_CH1FX
     ; fallthrough
 .fxUpdate
     ld a, [hli] ; Read the FX number
