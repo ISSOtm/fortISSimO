@@ -108,19 +108,21 @@ hUGE_TickSound::
 .noNewNote
 
     ; Process effects "update"
-    ld c, LOW(rNR43)
+    ld a, LOW(rNR42)
     ld hl, whUGE_CH4FX
     call .fxUpdate
-    ld c, LOW(rNR33)
+    ld a, LOW(rNR32)
     ld hl, whUGE_CH3FX
     call .fxUpdate
-    ld c, LOW(rNR23)
+    ld a, LOW(rNR22)
     ld hl, whUGE_CH2FX
     call .fxUpdate
-    ld c, LOW(rNR13)
+    ld a, LOW(rNR12)
     ld hl, whUGE_CH1FX
     ; fallthrough
 .fxUpdate
+    ld c, a
+    ld [whUGE_CurChanEnvPtr], a
     ld a, [hli] ; Read the FX number
     rra ; Is bit 0 set?
     ret c ; Return if no FX
@@ -160,7 +162,6 @@ hUGE_TickSound::
 .fx_noteCut ; No need for a `jr` for this one
     dec [hl]
     ret nz
-    dec c ; NRx2
     ; Write 0 to NRx2 to kill the channel
     xor a
     ldh [c], a
