@@ -73,6 +73,8 @@ G#8 EQU 68
 A_8 EQU 69
 A#8 EQU 70
 B_8 EQU 71
+
+LAST_NOTE EQU 72 ; Notes above this mark will not be played
+
 NOTE_JUMP EQU 72 ; Special note for jumping
-LAST_NOTE EQU 73
 ___ EQU 90 ; the default "no note" value
