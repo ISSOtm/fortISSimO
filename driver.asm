@@ -241,13 +241,14 @@ hUGE_CallUserRoutine:
 
 
 hUGE_ChannelJump:
-    dec hl
+    dec hl ; Skip note
+    dec hl ; Skip FX + instr
     ; Write new order index
     ld a, b
-    ld [hli], a
+    ld [hld], a
     ; Write new row index
     ld a, [whUGE_FXParams]
-    ld [hli], a
+    ld [hld], a
     dec hl
 
 ; @param hl Pointer to the channel's data
