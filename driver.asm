@@ -15,8 +15,33 @@ hUGE_StartSong::
     inc de
     ld [whUGE_Tempo], a
 
-init_channel: MACRO
-    ld hl, whUGE_CH\1OrderPtr
+    ld hl, whUGE_CH1OrderPtr
+    call .initChannel
+    ld hl, whUGE_CH2OrderPtr
+    call .initChannel
+    ld hl, whUGE_CH3OrderPtr
+    call .initChannel
+    ld hl, whUGE_CH4OrderPtr
+    call .initChannel
+
+    ; Init APU regs
+    ld a, $80
+    ldh [rNR52], a
+    ld a, $FF
+    ldh [rNR51], a
+    ld a, $77
+    ldh [rNR50], a
+
+    ; Schedule next playback immediately
+    ld a, 1
+    ld [whUGE_RemainingTicks], a
+
+    ; Re-enable playback
+    ; ld a, 1
+    ld [whUGE_Enabled], a
+    ret
+
+.initChannel
     ; Copy order table ptr
     ld a, [de]
     ld c, a
@@ -43,28 +68,6 @@ init_channel: MACRO
     ld a, b
     adc a, 0
     ld [hli], a
-ENDM
-    init_channel 1
-    init_channel 2
-    init_channel 3
-    init_channel 4
-PURGE init_channel
-
-    ; Init APU regs
-    ld a, $80
-    ldh [rNR52], a
-    ld a, $FF
-    ldh [rNR51], a
-    ld a, $77
-    ldh [rNR50], a
-
-    ; Schedule next playback immediately
-    ld a, 1
-    ld [whUGE_RemainingTicks], a
-
-    ; Re-enable playback
-    ; ld a, 1
-    ld [whUGE_Enabled], a
     ret
 
 
