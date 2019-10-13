@@ -34,6 +34,9 @@ whUGE_CH\1InstrPalettePtr:
 ; A mask to be applied to rNRx4
 whUGE_CH\1NRx4Mask:
     db
+; The channel's current volume
+whUGE_CH\1Volume:
+    db
 ; Which effect is currently active, times 2. Bit 0 is set if there is no FX
 whUGE_CH\1FX:
     db

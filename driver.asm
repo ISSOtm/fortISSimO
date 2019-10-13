@@ -276,6 +276,7 @@ hUGE_TickChannel:
     call nz, hUGE_LoadInstrument
     ld a, [hli]
     ld [whUGE_NRx4Mask], a
+    inc hl ; Skip volume
 
     ; Do effect's first tick
     ld a, b
@@ -472,7 +473,8 @@ hUGE_PlayNote:
 ; @param de A pointer to the channel's instrument palette
 ; @param hl A pointer to the channel's NRx4 mask
 ; @param c A pointer to the highest IO reg to write to
-; @destroy a c de hl
+; @param whUGE_CurChanEnvPtr The low byte of the pointer to NRx2
+; @destroy a c de
 hUGE_LoadInstrument:
     dec a
     ; Index into translation table
@@ -496,7 +498,7 @@ hUGE_LoadInstrument:
     ; Read NRx4 mask
     ld a, [de]
     inc de
-    ld [hl], a
+    ld [hli], a
     ; Write last three bytes to hardware regs
     ld a, [de]
     inc de
@@ -511,8 +513,26 @@ hUGE_LoadInstrument:
     ld a, [de]
     call z, .loadWave ; This works a tad differently for CH3
     ldh [c], a
+
+    ld a, [whUGE_CurChanEnvPtr]
+    ld c, a
+    ldh a, [c]
+    jr nz, .notCH3
+    ; Turn the 2-bit value into the same format as other channels
+    add a, a
+    and $C0
+    ld b, a
+    add a, a
+    xor b
+    ld b, a
+    rrca
+    rrca
+.notCH3
+    and $F0
+    ld [hld], a
     ret
 
+; @return Z Set
 .loadWave
     push hl
     ; Compute ptr to wave
