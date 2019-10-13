@@ -50,6 +50,14 @@ ENDM
     init_channel 4
 PURGE init_channel
 
+    ; Init APU regs
+    ld a, $80
+    ldh [rNR52], a
+    ld a, $FF
+    ldh [rNR51], a
+    ld a, $77
+    ldh [rNR50], a
+
     ; Schedule next playback immediately
     ld a, 1
     ld [whUGE_RemainingTicks], a
