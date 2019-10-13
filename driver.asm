@@ -73,8 +73,8 @@ hUGE_StartSong::
 
 hUGE_TickSound::
     ld a, [whUGE_Enabled]
-    and a
-    ret z
+    dec a
+    ret nz
 
     ld hl, whUGE_RemainingTicks
     dec [hl]
