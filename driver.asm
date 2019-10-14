@@ -373,7 +373,7 @@ hUGE_TickChannel:
     jr .doneWithFX ; Free slot
     jr .fx_setVolume
     jr .doneWithFX ; Free slot
-    jr .doneWithFX ; jr .fx_noteCut Does not do any init
+    jr .doneWithFX ; jr .fx_noteCut ; Does not do any init
     ; jr .fx_setSpeed
 
 .fx_setSpeed ; No need for a `jr` for this one
@@ -421,7 +421,8 @@ hUGE_TickChannel:
 
 .fx_volSlide
     ; Schedule effect to happen on next tick
-    ld a, 2
+    and %111
+    inc a ; Compensate for the update that's about to occur
     jr .doneWithFX
 
 .fx_setDuty
