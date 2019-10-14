@@ -381,7 +381,7 @@ hUGE_TickChannel:
     jr .noMoreFX
 
 .fx_setMasterVolume
-    ldh [rNR51], a
+    ldh [rNR50], a
     jr .noMoreFX
 
 .fx_callRoutine
@@ -403,7 +403,7 @@ hUGE_TickChannel:
     jr .doneWithFX
 
 .fx_setPan
-    ldh [rNR50], a
+    ldh [rNR51], a
     jr .noMoreFX
 
 .fx_setVolume
