@@ -428,8 +428,8 @@ hUGE_TickChannel:
 .fx_setDuty
     ld b, a
     ld a, [whUGE_CurChanEnvPtr]
-    dec c
     ld c, a
+    dec c
     ld a, b
     ldh [c], a
     ; jr .noMoreFX
