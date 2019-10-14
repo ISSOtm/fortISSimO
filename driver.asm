@@ -406,24 +406,28 @@ hUGE_TickChannel:
     ldh [rNR50], a
     jr .noMoreFX
 
-.fx_setDuty
+.fx_setVolume
+    dec hl ; Skip FX buf
+    dec hl ; Skip FX
+    ld [hli], a ; Write back new volume
     ld b, a
     ld a, [whUGE_CurChanEnvPtr]
-    dec c
     ld c, a
-    ld a, b
+    ldh a, [c]
+    and $0F ; Keep envelope bits
+    or b ; But overwrite volume
     ldh [c], a
-    jr .noMoreFX
+    jr .noFX ; Already pointing at FX ID
 
 .fx_volSlide
     ; Schedule effect to happen on next tick
     ld a, 2
     jr .doneWithFX
 
-.fx_setVolume
-    ; TODO: take the instrument's envelope into account?
+.fx_setDuty
     ld b, a
     ld a, [whUGE_CurChanEnvPtr]
+    dec c
     ld c, a
     ld a, b
     ldh [c], a
