@@ -148,8 +148,8 @@ hUGE_TickSound::
     ; Panning and duty don't reach here, so use their space for 4 free bytes
     dec [hl]
     ret nz
-    nop ; TODO
-    nop
+    dec hl ; Skip FX params
+    ld a, [hld] ; Read FX buf: the note to play
     jr .fx_noteDelay
     jr .fx_volSlide
     jr .noMoreFX ; Free slot
@@ -179,6 +179,35 @@ hUGE_TickSound::
     jr .noMoreFX
 
 .fx_noteDelay
+    push af ; Stash note for later
+    ld [hl], 1 ; Stop FX
+    ld de, whUGE_CH1Instrument - whUGE_CH1FX
+    add hl, de
+    ; Figure out argument C to LoadInstrument
+    ld a, [whUGE_CurChanEnvPtr]
+    cp LOW(rNR42)
+    sbc a, -1 ; CH4 provides NR43, not NR42
+    ld c, a
+    ; From now on, we're mostly rehashing the normal playback code
+
+    ld a, [hli] ; Read instrument
+    ld b, a
+    inc hl ; Skip note
+    ; Read instrument palette ptr
+    ld a, [hli]
+    ld e, a
+    ld a, [hli]
+    ld d, a
+    res 7, [hl] ; Reset retrigger bit
+    ld a, b
+    and $0F
+    call nz, hUGE_LoadInstrument
+    ld a, [hli]
+    ld [whUGE_NRx4Mask], a
+    inc hl ; Skip volume
+    pop af ; Get back note
+    cp LAST_NOTE
+    jp c, hUGE_PlayNote
     ret
 
 .fx_volSlide
@@ -322,10 +351,16 @@ hUGE_TickChannel:
     ; Reset "restart" bit of NRx4 mask
     res 7, [hl]
 
+    ; Hack: note delay requires skipping loading the instrument
+    ld a, b
+    and $F0
+    cp $70 ; Note delay
+    jr z, .noteDelayInstrSkip
     ; Compute instrument ptr
     ld a, b
     and $0F ; Mask out other bits
     call nz, hUGE_LoadInstrument
+.noteDelayInstrSkip
     ld a, [hli]
     ld [whUGE_NRx4Mask], a
     inc hl ; Skip volume
