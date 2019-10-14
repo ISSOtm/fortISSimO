@@ -2,7 +2,7 @@
 
 A reimplementation from scratch of [SuperDisk's GB sound driver](https://github.com/SuperDisk/hUGEDriver/).
 
-For documentation and example of usage, see [fortISSimO-demo](https://github.com/ISSOtm/fortISSimO).
+For documentation and example of usage, see [fortISSimO-demo](https://github.com/ISSOtm/fortISSimO-demo).
 
 ## Quick start
 
