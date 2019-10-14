@@ -171,12 +171,16 @@ hUGE_TickSound::
     ret
 
 .fx_callRoutine
+    ld a, [hld] ; Read param
+    ld c, [hl]
+    inc [hl] ; Increment tick count
     push hl
-    ld h, 1
     call hUGE_CallUserRoutine
     pop hl
     ret nc
-    jr .noMoreFX
+    dec hl ; Skip FX buffer
+    ld [hl], 1
+    ret
 
 .fx_noteDelay
     push af ; Stash note for later
@@ -255,7 +259,7 @@ hUGE_SetChannelVolume:
     jp hUGE_PlayNote ; Retrigger the note to take the volume change into account
 
 ; @param a The ID of the routine to call
-; @param h Even on 1st call, odd on "updates", including during 1st tick!
+; @param c The number of times the routine has been called before
 hUGE_CallUserRoutine:
     add a, LOW(hUGE_UserRoutines)
     ld l, a
@@ -420,11 +424,7 @@ hUGE_TickChannel:
     jr .noMoreFX
 
 .fx_callRoutine
-    push hl
-    ld h, 0
-    call hUGE_CallUserRoutine
-    pop hl
-    jr c, .noMoreFX
+    xor a
     jr .doneWithFX
 
 .fx_noteDelay
