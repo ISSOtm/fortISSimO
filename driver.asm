@@ -197,6 +197,9 @@ hUGE_TickSound::
 .noOffset
     xor a
     add a, [hl]
+    cp LAST_NOTE
+    jp c, hUGE_PlayNote
+    ld a, LAST_NOTE - 1
     jp hUGE_PlayNote
 
 .fx_callRoutine
