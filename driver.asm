@@ -488,6 +488,8 @@ hUGE_TickChannel:
 
 
 ; @param a The ID of the note to play
+; @param whUGE_CurChanEnvPtr The low byte of a pointer to the channel's NRx2 register
+; @param whUGE_NRx4Mask The mask to apply to NRx4
 hUGE_PlayNote:
     add a, a
     add a, LOW(hUGE_NoteTable)
