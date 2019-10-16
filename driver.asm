@@ -108,17 +108,17 @@ hUGE_TickSound::
 .noNewNote
 
     ; Process effects "update"
-    ld a, LOW(rNR42)
-    ld hl, whUGE_CH4FX
-    call .fxUpdate
-    ld a, LOW(rNR32)
-    ld hl, whUGE_CH3FX
+    ld a, LOW(rNR12)
+    ld hl, whUGE_CH1FX
     call .fxUpdate
     ld a, LOW(rNR22)
     ld hl, whUGE_CH2FX
     call .fxUpdate
-    ld a, LOW(rNR12)
-    ld hl, whUGE_CH1FX
+    ld a, LOW(rNR32)
+    ld hl, whUGE_CH3FX
+    call .fxUpdate
+    ld a, LOW(rNR42)
+    ld hl, whUGE_CH4FX
     ; fallthrough
 .fxUpdate
     ld c, a
