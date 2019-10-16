@@ -137,7 +137,7 @@ hUGE_TickSound::
     ret
 
 .fxTable
-    jr .fxTable ; NYI .fx_arpeggio
+    jr .fx_arpeggio
     jr .fxTable ; NYI .fx_slideUp
     jr .fxTable ; NYI .fx_slideDown
     jr .fxTable ; NYI .fx_toneporta
@@ -170,6 +170,34 @@ hUGE_TickSound::
     dec hl ; Skip FX buffer
     ld [hl], 1
     ret
+
+.fx_arpeggio
+    ld a, [hld]
+    ld b, a
+    dec [hl]
+    jr nz, .noWrap
+    ld [hl], 3
+.noWrap
+    ld a, [hld]
+    rr a ; Turn counter into actions
+    dec hl ; Skip FX
+    dec hl ; Skip volume
+    ld a, [hld]
+    res 7, a ; Don't retrigger the note
+    ld [whUGE_NRx4Mask], a
+    dec hl ; Skip instr palette ptr
+    dec hl
+    jr z, .noOffset ; Counter == 1
+    ld a, b
+    jr nc, .useLowerNibble ; Counter == 2
+    swap a
+.useLowerNibble
+    and $0F
+    db $FE ; cp a, imm8
+.noOffset
+    xor a
+    add a, [hl]
+    jp hUGE_PlayNote
 
 .fx_callRoutine
     ld a, [hld] ; Read param
@@ -395,7 +423,7 @@ hUGE_TickChannel:
 ; Some value to put in "param working memory" should be returned in A
 ; HL must be preserved
 .fxTable
-    jr .doneWithFX ; NYI .fx_arpeggio
+    jr .fx_arpeggio
     jr .doneWithFX ; NYI .fx_portaUp
     jr .doneWithFX ; NYI .fx_portaDown
     jr .doneWithFX ; NYI .fx_toneporta
@@ -415,6 +443,10 @@ hUGE_TickChannel:
 .fx_setSpeed ; No need for a `jr` for this one
     ld [whUGE_Tempo], a
     jr .noMoreFX
+
+.fx_arpeggio
+    ld a, 2 ; Do not offset (counter = 1) on this tick
+    jr .doneWithFX
 
 .fx_setMasterVolume
     ldh [rNR50], a
