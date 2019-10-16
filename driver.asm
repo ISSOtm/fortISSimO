@@ -137,12 +137,13 @@ hUGE_TickSound::
     ret
 
 .fxTable
-    jr .noMoreFX ; NYI .fx_arpeggio
-    jr .noMoreFX ; NYI .fx_slideUp
-    jr .noMoreFX ; NYI .fx_slideDown
-    jr .noMoreFX ; NYI .fx_toneporta
-    jr .noMoreFX ; NYI .fx_vibrato
-    jr .noMoreFX ; jr .fx_setMasterVolume ; Does not update
+    jr .fxTable ; NYI .fx_arpeggio
+    jr .fxTable ; NYI .fx_slideUp
+    jr .fxTable ; NYI .fx_slideDown
+    jr .fxTable ; NYI .fx_toneporta
+    jr .fxTable ; NYI .fx_vibrato
+    nop ; jr .fx_setMasterVolume ; Does not update
+    nop
     jr .fx_callRoutine
     ; jr .fx_noteDelay
     ; Panning and duty don't reach here, so use their space for 4 free bytes
@@ -152,10 +153,10 @@ hUGE_TickSound::
     ld a, [hld] ; Read FX buf: the note to play
     jr .fx_noteDelay
     jr .fx_volSlide
-    jr .noMoreFX ; Free slot
+    jr .fxTable ; Free slot
     nop ; jr .fx_setVolume ; Does not update
     nop
-    jr .noMoreFX ; Free slot
+    jr .fxTable ; Free slot
     ; jr .fx_noteCut
     ; jr .fx_SetSpeed ; Does not update
 
@@ -234,10 +235,6 @@ hUGE_TickSound::
     inc hl ; Skip volume
     ld [hl], 1
     ret
-
-    ; TODO: get rid of this
-.noMoreFX
-    ld b, b
 
 ; @param hl A pointer to the channel's volume byte
 ; @param c The low byte of a pointer to NRx2
