@@ -136,10 +136,98 @@ hUGE_TickSound::
     inc hl ; Skip FX buffer, since the FX param tends to get used often
     ret
 
+
+.fx_arpeggio
+    ld a, [hld]
+    ld b, a
+    dec [hl]
+    jr nz, .noWrap
+    ld [hl], 3
+.noWrap
+    ld a, [hld]
+    rr a ; Turn counter into actions
+    dec hl ; Skip FX
+    dec hl ; Skip volume
+    ld a, [hld]
+    res 7, a ; Don't retrigger the note
+    ld [whUGE_NRx4Mask], a
+    dec hl ; Skip instr palette ptr
+    dec hl
+    jr z, .noOffset ; Counter == 1
+    ld a, b
+    jr nc, .useLowerNibble ; Counter == 2
+    swap a
+.useLowerNibble
+    and $0F
+    db $FE ; cp a, imm8
+.noOffset
+    xor a
+    add a, [hl]
+    ld de, whUGE_CH1Period - whUGE_CH1Note
+    add hl, de
+    cp LAST_NOTE
+    jp c, hUGE_PlayNote
+    ld a, LAST_NOTE - 1
+    jp hUGE_PlayNote
+
+.fx_portaUp
+    ld a, [hli] ; Read param
+    ; Add that offset to the period, and write back
+    add a, [hl]
+    ld [hli], a
+    ld b, a
+    adc a, [hl]
+    sub b
+    ld c, a
+    ld [hl], a
+    and $F8 ; Check if overflow occurred
+    jr z, .playThisFreq
+    ; Cap out
+    ld a, 7
+    ld d, a
+    ld [hld], a
+    ld a, $FF
+.lastPorta
+    ld b, a
+    ld [hld], a
+    dec hl ; Skip FX params
+    dec hl ; Skip FX buf
+    ld a, 1
+    ld [hld], a
+    dec hl ; Skip volume
+.playFreq
+    ld a, [hl]
+    ld [whUGE_NRx4Mask], a
+    jp hUGE_PlayFreq
+.playThisFreq
+    ld de, whUGE_CH1NRx4Mask - whUGE_CH1Period
+    add hl, de
+    ld d, c
+    jr .playFreq
+
+.fx_portaDown
+    ld a, [hli] ; Read param
+    ; Add its opposite to the period, and write back
+    cpl
+    scf
+    adc a, [hl]
+    ld [hli], a
+    ld b, a
+    ld a, $FF
+    adc a, [hl]
+    ld c, a
+    ld [hl], a
+    inc a ; Check if overflow occurred
+    jr nz, .playThisFreq
+    ; xor a
+    ld d, a
+    ld [hld], a
+    jr .lastPorta
+
 .fxTable
     jr .fx_arpeggio
-    jr .fxTable ; NYI .fx_slideUp
-    jr .fxTable ; NYI .fx_slideDown
+    jr .fx_portaUp
+    jr .fx_portaDown
     jr .fxTable ; NYI .fx_toneporta
     jr .fxTable ; NYI .fx_vibrato
     nop ; jr .fx_setMasterVolume ; Does not update
@@ -170,37 +258,6 @@ hUGE_TickSound::
     dec hl ; Skip FX buffer
     ld [hl], 1
     ret
-
-.fx_arpeggio
-    ld a, [hld]
-    ld b, a
-    dec [hl]
-    jr nz, .noWrap
-    ld [hl], 3
-.noWrap
-    ld a, [hld]
-    rr a ; Turn counter into actions
-    dec hl ; Skip FX
-    dec hl ; Skip volume
-    ld a, [hld]
-    res 7, a ; Don't retrigger the note
-    ld [whUGE_NRx4Mask], a
-    dec hl ; Skip instr palette ptr
-    dec hl
-    jr z, .noOffset ; Counter == 1
-    ld a, b
-    jr nc, .useLowerNibble ; Counter == 2
-    swap a
-.useLowerNibble
-    and $0F
-    db $FE ; cp a, imm8
-.noOffset
-    xor a
-    add a, [hl]
-    cp LAST_NOTE
-    jp c, hUGE_PlayNote
-    ld a, LAST_NOTE - 1
-    jp hUGE_PlayNote
 
 .fx_callRoutine
     ld a, [hld] ; Read param
@@ -439,8 +496,8 @@ hUGE_TickChannel:
 ; HL must be preserved
 .fxTable
     jr .fx_arpeggio
-    jr .doneWithFX ; NYI .fx_portaUp
-    jr .doneWithFX ; NYI .fx_portaDown
+    jr .doneWithFX ; jr .fx_portaUp ; Does not do any init
+    jr .doneWithFX ; jr .fx_portaDown ; Does not do any init
     jr .doneWithFX ; NYI .fx_toneporta
     jr .doneWithFX ; NYI .fx_vibrato
     jr .fx_setMasterVolume
@@ -554,6 +611,11 @@ hUGE_PlayNote:
     ld d, a
     ld [hli], a
 
+; @param d The high byte of the frequency to play
+; @param b The low byte of the frequency to play
+; @param whUGE_CurChanEnvPtr The low byte of a pointer to the channel's NRx2 register
+; @param whUGE_NRx4Mask The mask to apply to NRx4
+hUGE_PlayFreq:
     ; Get ptr to NRx3
     ld a, [whUGE_CurChanEnvPtr]
     inc a
