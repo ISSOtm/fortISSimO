@@ -46,6 +46,9 @@ whUGE_CH\1FXBuf:
 ; The FX's params
 whUGE_CH\1FXParams:
     db
+; The value that gets written to NRx3 and NRx4
+whUGE_CH\1Period:
+    dw
 ENDM
     hUGE_channel 1
     hUGE_channel 2

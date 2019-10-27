@@ -245,7 +245,8 @@ hUGE_TickSound::
     call nz, hUGE_LoadInstrument
     ld a, [hli]
     ld [whUGE_NRx4Mask], a
-    inc hl ; Skip volume
+    ld de, whUGE_CH1Period - whUGE_CH1Volume
+    add hl, de
     pop af ; Get back note
     cp LAST_NOTE
     jp c, hUGE_PlayNote
@@ -289,6 +290,8 @@ hUGE_SetChannelVolume:
 .notCH3
     ldh [c], a ; Write that to NRx2
     set 7, [hl] ; Get the note to retrigger
+    ld de, whUGE_CH1Period - whUGE_CH1NRx4Mask
+    add hl, de
     jp hUGE_PlayNote ; Retrigger the note to take the volume change into account
 
 ; @param a The ID of the routine to call
@@ -532,6 +535,7 @@ hUGE_TickChannel:
 
 
 ; @param a The ID of the note to play
+; @param hl A pointer to which to write the note's period
 ; @param whUGE_CurChanEnvPtr The low byte of a pointer to the channel's NRx2 register
 ; @param whUGE_NRx4Mask The mask to apply to NRx4
 hUGE_PlayNote:
@@ -544,9 +548,11 @@ hUGE_PlayNote:
     ; Read period
     ld a, [de]
     ld b, a
+    ld [hli], a
     inc de
     ld a, [de]
     ld d, a
+    ld [hli], a
 
     ; Get ptr to NRx3
     ld a, [whUGE_CurChanEnvPtr]
