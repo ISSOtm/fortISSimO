@@ -224,6 +224,27 @@ hUGE_TickSound::
     ld [hld], a
     jr .lastPorta
 
+.fx_volSlide
+    ; Add a signed 5-bit offset to the current volume
+    ld a, [hld] ; Get params
+    dec [hl]
+    ret nz
+    ; Reload counter
+    ld b, a
+    and %111
+    ld [hld], a
+    dec hl ; Skip FX number
+    ld a, [hl] ; Get current volume (low 4 bits reset)
+    rrca
+    add a, b ; Add signed 5-bit offset
+    and $F8 ; Clear low 3 bits so they don't interfere
+    add a, a
+    ; If result was negative (due to overflow), the FX is done
+    jr nc, hUGE_SetChannelVolume
+    inc hl ; Skip volume
+    ld [hl], 1
+    ret
+
 .fxTable
     jr .fx_arpeggio
     jr .fx_portaUp
@@ -307,27 +328,6 @@ hUGE_TickSound::
     pop af ; Get back note
     cp LAST_NOTE
     jp c, hUGE_PlayNote
-    ret
-
-.fx_volSlide
-    ; Add a signed 5-bit offset to the current volume
-    ld a, [hld] ; Get params
-    dec [hl]
-    ret nz
-    ; Reload counter
-    ld b, a
-    and %111
-    ld [hld], a
-    dec hl ; Skip FX number
-    ld a, [hl] ; Get current volume (low 4 bits reset)
-    rrca
-    add a, b ; Add signed 5-bit offset
-    and $F8 ; Clear low 3 bits so they don't interfere
-    add a, a
-    ; If result was negative (due to overflow), the FX is done
-    jr nc, hUGE_SetChannelVolume
-    inc hl ; Skip volume
-    ld [hl], 1
     ret
 
 ; @param hl A pointer to the channel's volume byte
