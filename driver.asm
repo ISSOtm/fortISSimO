@@ -215,20 +215,25 @@ hUGE_TickSound::
     ret
 
 .fx_noteDelay
+    cp LAST_NOTE ; Check if note is "normal" for later
     push af ; Stash note for later
     ld [hl], 1 ; Stop FX
     ld de, whUGE_CH1Instrument - whUGE_CH1FX
     add hl, de
+    ; From now on, we're mostly rehashing the normal playback code
+
+    ld b, [hl] ; Read instrument
+    inc hl
+    ; If the note is a normal one, write it back
+    jr nc, .noNoteWriteback
+    ld [hl], a
+.noNoteWriteback
+    inc hl ; Skip note
     ; Figure out argument C to LoadInstrument
     ld a, [whUGE_CurChanEnvPtr]
     cp LOW(rNR42)
     sbc a, -1 ; CH4 provides NR43, not NR42
     ld c, a
-    ; From now on, we're mostly rehashing the normal playback code
-
-    ld a, [hli] ; Read instrument
-    ld b, a
-    inc hl ; Skip note
     ; Read instrument palette ptr
     ld a, [hli]
     ld e, a
@@ -372,7 +377,11 @@ hUGE_TickChannel:
     cp NOTE_JUMP
     jr z, hUGE_ChannelJump
     ld [whUGE_CurChanNote], a
-    ld [hli], a
+    cp LAST_NOTE
+    jr nc, .noNoteWriteback
+    ld [hl], a
+.noNoteWriteback
+    inc hl
 
     ; Read ptr to instrument translation table
     ld a, [hli]
