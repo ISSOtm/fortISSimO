@@ -346,10 +346,15 @@ hUGE_SetChannelVolume:
     ; Bit 7 will be ignored by the hardware
 .notCH3
     ldh [c], a ; Write that to NRx2
-    set 7, [hl] ; Get the note to retrigger
-    ld de, whUGE_CH1Period - whUGE_CH1NRx4Mask
+    ld a, [hli]
+    or $80 ; Get the note to retrigger
+    ld [whUGE_NRx4Mask], a
+    ld de, whUGE_CH1Period - whUGE_CH1Volume
     add hl, de
-    jp hUGE_PlayNote ; Retrigger the note to take the volume change into account
+    ld a, [hli]
+    ld b, a
+    ld d, [hl]
+    jp hUGE_PlayFreq ; Retrigger the note to take the volume change into account
 
 ; @param a The ID of the routine to call
 ; @param c The number of times the routine has been called before
