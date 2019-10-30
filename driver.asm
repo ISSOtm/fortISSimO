@@ -137,6 +137,45 @@ hUGE_TickSound::
     ret
 
 
+    ; Implement a poor man's (square) vibrato
+    ; Not a big deal because of the limited resolution and high-pass filter
+.fx_vibrato
+    and $F0 ; Keep speed only
+    rrca
+    rrca
+    add a, [hl]
+    jr nc, .noOverflow
+    xor a
+.noOverflow
+    ld [hli], a
+    ld b, a
+    and $40
+    ld d, a ; Set offset to 0 if we're going to jump
+    ld a, [hli] ; Re-read param (speed + depth)
+    jr z, .noVibOffset
+    and $0F ; Keep depth only
+    bit 7, b
+    jr z, .gotVibOffset
+    cpl
+    inc a
+.gotVibOffset
+    ld d, a
+.noVibOffset
+    ld a, [hli] ; Read period low byte
+    add a, d
+    ld b, a
+    adc a, [hl]
+    rlc d ; Add high byte ($FF) if added value is negative
+    sbc b
+    ; Go to read NRx4 mask
+    ld de, whUGE_CH1NRx4Mask - (whUGE_CH1Period + 1)
+    add hl, de
+    ; Store freq high byte
+    ld d, a
+    ld a, [hl]
+    ld [whUGE_NRx4Mask], a
+    jp hUGE_PlayFreq
+
 .fx_arpeggio
     ld a, [hld]
     ld b, a
@@ -241,9 +280,10 @@ hUGE_TickSound::
     jr .fx_portaUp
     jr .fx_portaDown
     jr .fx_toneporta
-    jr .fxTable ; NYI .fx_vibrato
-    nop ; jr .fx_setMasterVolume ; Does not update
-    nop
+    ; jr .fx_vibrato
+    ; Master volume doesn't reach here, so use its space for 2 free bytes
+    ld a, [hld] ; Read param (speed + depth)
+    jp .fx_vibrato
     jr .fx_callRoutine
     ; jr .fx_noteDelay
     ; Panning and duty don't reach here, so use their space for 4 free bytes
@@ -576,7 +616,7 @@ hUGE_TickChannel:
     jr .doneWithFX ; jr .fx_portaUp ; Does not do any init
     jr .doneWithFX ; jr .fx_portaDown ; Does not do any init
     jr .fx_toneporta
-    jr .doneWithFX ; NYI .fx_vibrato
+    jr .fx_vibrato
     jr .fx_setMasterVolume
     jr .fx_callRoutine
     jr .fx_noteDelay
@@ -616,6 +656,9 @@ hUGE_TickChannel:
     ldh [rNR50], a
     jr .noMoreFX
 
+.fx_vibrato
+    and a ; If argument == 0, continue where previous vib left off
+    jr z, .continueFX
 .fx_callRoutine
     xor a
     jr .doneWithFX
@@ -670,12 +713,16 @@ hUGE_TickChannel:
     ld [hli], a
     ; FX storage doesn't matter, write a dummy value there
 .doneWithFX
-    ; Write FX storage
+    ; Write FX buf
     ld [hli], a
     ; Write FX params
     ld a, [whUGE_FXParams]
     ld [hli], a
 
+    db $11 ; ld de, imm16
+.continueFX
+    inc hl
+    inc hl
     ; Play the channel's note
     ld a, [whUGE_CurChanNote]
     cp LAST_NOTE
