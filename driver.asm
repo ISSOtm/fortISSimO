@@ -224,24 +224,15 @@ hUGE_TickSound::
     ld [hld], a
     jr .lastPorta
 
-.fx_volSlide
-    ; Add a signed 5-bit offset to the current volume
-    ld a, [hld] ; Get params
-    dec [hl]
-    ret nz
-    ; Reload counter
-    ld b, a
-    and %111
-    ld [hld], a
-    dec hl ; Skip FX number
-    ld a, [hl] ; Get current volume (low 4 bits reset)
-    rrca
-    add a, b ; Add signed 5-bit offset
-    and $F8 ; Clear low 3 bits so they don't interfere
-    add a, a
-    ; If result was negative (due to overflow), the FX is done
-    jr nc, hUGE_SetChannelVolume
-    inc hl ; Skip volume
+.fx_callRoutine
+    ld a, [hld] ; Read param
+    ld c, [hl]
+    inc [hl] ; Increment tick count
+    push hl
+    call hUGE_CallUserRoutine
+    pop hl
+    ret nc
+    dec hl ; Skip FX buffer
     ld [hl], 1
     ret
 
@@ -249,7 +240,7 @@ hUGE_TickSound::
     jr .fx_arpeggio
     jr .fx_portaUp
     jr .fx_portaDown
-    jr .fxTable ; NYI .fx_toneporta
+    jr .fx_toneporta
     jr .fxTable ; NYI .fx_vibrato
     nop ; jr .fx_setMasterVolume ; Does not update
     nop
@@ -280,15 +271,94 @@ hUGE_TickSound::
     ld [hl], 1
     ret
 
-.fx_callRoutine
-    ld a, [hld] ; Read param
-    ld c, [hl]
-    inc [hl] ; Increment tick count
-    push hl
-    call hUGE_CallUserRoutine
-    pop hl
-    ret nc
-    dec hl ; Skip FX buffer
+.fx_toneporta
+    dec hl ; Skip FX param
+    ; Go to note to read its period
+    ld a, l
+    sub whUGE_CH1FXBuf - whUGE_CH1NRx4Mask
+    ld e, a
+    ld a, h
+    sbc 0
+    ld d, a
+    ld a, [de] ; Read NRx4 mask
+    ld [whUGE_NRx4Mask], a
+    dec de
+    dec de
+    dec de
+    ld a, [de] ; Read target note
+    add a, a
+    add a, LOW(hUGE_NoteTable)
+    ld e, a
+    adc a, HIGH(hUGE_NoteTable)
+    sub e
+    ld d, a
+    ld a, [de]
+    ld c, a
+    inc de
+    ld a, [de]
+    ld e, a
+    ; Compute next frequency
+    ld a, [hli] ; Read buffer (sign bit)
+    add a, a
+    ld a, [hli] ; Read param (offset per tick)
+    jr c, .subtract
+    ; Add to freq
+    add a, [hl]
+    ld [hli], a
+    ld b, a
+    adc a, [hl]
+    sub b
+    jr .gotNextFreq
+.subtract
+    cpl
+    scf
+    adc a, [hl]
+    ld [hli], a
+    ld b, a
+    ld a, -1
+    adc a, [hl]
+.gotNextFreq
+    ld [hld], a
+    ld d, a
+    ; Check if got on the other side of the target freq
+    ld a, c
+    sub b
+    ld a, e
+    sbc d
+    dec hl ; Skip low byte of period
+    dec hl ; Skip params
+    xor [hl] ; xor sign bit with computed one
+    add a, a
+    jp nc, hUGE_PlayFreq ; If they don't differ, keep going
+    dec hl ; Skip buf
+    ld a, 1 ; Terminate FX
+    ld [hli], a
+    inc hl ; Skip buf
+    inc hl ; Skip params
+    ; Write target freq
+    ld a, c
+    ld [hli], a
+    ld [hl], e
+    jp hUGE_PlayFreq
+
+.fx_volSlide
+    ; Add a signed 5-bit offset to the current volume
+    ld a, [hld] ; Get params
+    dec [hl]
+    ret nz
+    ; Reload counter
+    ld b, a
+    and %111
+    ld [hld], a
+    dec hl ; Skip FX number
+    ld a, [hl] ; Get current volume (low 4 bits reset)
+    rrca
+    add a, b ; Add signed 5-bit offset
+    and $F8 ; Clear low 3 bits so they don't interfere
+    add a, a
+    ; If result was negative (due to overflow), the FX is done
+    jr nc, hUGE_SetChannelVolume
+    inc hl ; Skip volume
     ld [hl], 1
     ret
 
@@ -503,7 +573,7 @@ hUGE_TickChannel:
     jr .fx_arpeggio
     jr .doneWithFX ; jr .fx_portaUp ; Does not do any init
     jr .doneWithFX ; jr .fx_portaDown ; Does not do any init
-    jr .doneWithFX ; NYI .fx_toneporta
+    jr .fx_toneporta
     jr .doneWithFX ; NYI .fx_vibrato
     jr .fx_setMasterVolume
     jr .fx_callRoutine
@@ -523,6 +593,21 @@ hUGE_TickChannel:
 
 .fx_arpeggio
     ld a, 2 ; Do not offset (counter = 1) on this tick
+    jr .doneWithFX
+
+.fx_toneporta
+    ld b, a
+    ; Save this
+    ld a, [whUGE_CurChanNote]
+    ld c, a
+    ; Prevent note playback
+    ld a, LAST_NOTE
+    ld [whUGE_CurChanNote], a
+    ; Check if the target note is higher or lower than the current one
+    ld a, c
+    sub b
+    jr z, .noMoreFX
+    rrca ; Get carry in bit 7
     jr .doneWithFX
 
 .fx_setMasterVolume
