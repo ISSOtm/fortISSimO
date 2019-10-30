@@ -330,6 +330,8 @@ hUGE_TickSound::
     xor [hl] ; xor sign bit with computed one
     add a, a
     jp nc, hUGE_PlayFreq ; If they don't differ, keep going
+    ld b, c
+    ld d, e
     dec hl ; Skip buf
     ld a, 1 ; Terminate FX
     ld [hli], a
