@@ -614,7 +614,8 @@ hUGE_TickChannel:
 ; Some value to put in "param working memory" should be returned in A
 ; HL must be preserved
 .fxTable
-    jr .fx_arpeggio
+    ; jr .fx_arpeggio
+    ld a, 2 ; Uses the lack of init right below
     jr .doneWithFX ; jr .fx_portaUp ; Does not do any init
     jr .doneWithFX ; jr .fx_portaDown ; Does not do any init
     jr .fx_toneporta
@@ -634,10 +635,6 @@ hUGE_TickChannel:
 .fx_setSpeed ; No need for a `jr` for this one
     ld [whUGE_Tempo], a
     jr .noMoreFX
-
-.fx_arpeggio
-    ld a, 2 ; Do not offset (counter = 1) on this tick
-    jr .doneWithFX
 
 .fx_toneporta
     ld b, a
