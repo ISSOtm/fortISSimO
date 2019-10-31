@@ -686,6 +686,14 @@ hUGE_TickChannel:
     ld b, a
     ld a, [whUGE_CurChanEnvPtr]
     ld c, a
+    cp LOW(rNR32)
+    jr nz, .noCH3VolumeTranslation
+    ld a, b
+    and $C0
+    srl b
+    xor b
+    ld b, a
+.noCH3VolumeTranslation
     ldh a, [c]
     and $0F ; Keep envelope bits
     or b ; But overwrite volume
