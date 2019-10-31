@@ -27,10 +27,12 @@ hUGE_StartSong::
     ; Init APU regs
     ld a, $80
     ldh [rNR52], a
-    ld a, $FF
-    ldh [rNR51], a
     ld a, $77
     ldh [rNR50], a
+    ld a, $FF
+    ldh [rNR51], a
+    ; ld a, $FF
+    ld [whUGE_CurWaveID], a
 
     ; Schedule next playback immediately
     ld a, 1
@@ -877,6 +879,11 @@ hUGE_LoadInstrument:
 ; @return Z Set
 .loadWave
     push hl
+    ld hl, whUGE_CurWaveID
+    cp [hl]
+    jr z, .waveLoaded ; Don't kill the channel if the wave doesn't need to be changed
+    ld [hl], a ; But otherwise, keep track of the wave we're loading
+
     ; Compute ptr to wave
     ; FIXME: limits the number of waves to 16
     add a, LOW(hUGE_Waves)
@@ -895,6 +902,7 @@ REPT 16
 hUGE_TARGET = hUGE_TARGET + 1
 ENDR
 PURGE hUGE_TARGET
+.waveLoaded
     pop hl
 
     ; Return back to main code, enabling CH3 again

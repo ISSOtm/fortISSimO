@@ -56,6 +56,11 @@ ENDM
     hUGE_channel 4
 PURGE hUGE_channel
 
+; The ID of the wave currently loaded to wave RAM
+; Set to $FF if no wave has been loaded yet
+whUGE_CurWaveID::
+    db
+
 ;; Temporary memory for processing
 
 whUGE_FXParams:
