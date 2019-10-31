@@ -452,12 +452,16 @@ hUGE_SetChannelVolume:
     ld [hld], a
     bit 3, c ; Out of all NRx2, this is only set for NR32
     jr z, .notCH3
-    and $C0 ; Keep only the upper 2 bits
-    ; Convert to NR32 encoding
-    ld b, a
+    and a ; 0 translates to 0
+    jr z, .notCH3
+    inc a
+    cp $B0
+    adc a, 0
+    cp $60
+    adc a, 0
     rrca
-    xor b
-    ; Bit 7 will be ignored by the hardware
+    rrca
+    rrca
 .notCH3
     ldh [c], a ; Write that to NRx2
     ld a, [hli]
@@ -686,9 +690,16 @@ hUGE_TickChannel:
     cp LOW(rNR32)
     jr nz, .noCH3VolumeTranslation
     ld a, b
-    and $C0
-    srl b
-    xor b
+    and a ; 0 translates to 0
+    jr z, .noCH3VolumeTranslation
+    inc a
+    cp $B0
+    adc a, 0
+    cp $60
+    adc a, 0
+    rrca
+    rrca
+    rrca
     ld b, a
 .noCH3VolumeTranslation
     ldh a, [c]
