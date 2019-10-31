@@ -868,6 +868,7 @@ hUGE_LoadInstrument:
     ld b, a
     rrca
     rrca
+    or b
 .notCH3
     and $F0
     ld [hld], a
