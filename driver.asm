@@ -862,13 +862,13 @@ hUGE_LoadInstrument:
     ; Turn the 2-bit value into the same format as other channels
     add a, a
     and $C0
-    ld b, a
+    ld e, a
     add a, a
-    xor b
-    ld b, a
+    xor e
+    ld e, a
     rrca
     rrca
-    or b
+    or e
 .notCH3
     and $F0
     ld [hld], a
