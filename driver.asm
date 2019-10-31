@@ -881,7 +881,7 @@ hUGE_LoadInstrument:
     add a, LOW(hUGE_Waves)
     ld l, a
     adc a, HIGH(hUGE_Waves)
-    sub e
+    sub l
     ld h, a
 
     ; Kill CH3 while we load the wave
