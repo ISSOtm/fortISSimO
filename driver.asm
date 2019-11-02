@@ -523,7 +523,7 @@ hUGE_TickChannel:
     inc [hl]
     ld a, [de] ; Read nb of orders
     sub [hl] ; Check if we need to wrap
-    jr c, .noCarry
+    jr nz, .noCarry
     ld [hl], a ; Apply wrap
 .noCarry
     inc de ; Skip nb of orders
