@@ -1015,6 +1015,7 @@ FxPosJump:
 	; TODO: this should be safe? I think?
 	ld hl, whUGE.orderIdx
 	ld a, b
+	dec a ; TODO: have tracker do this
 	add a, a ; TODO: have tracker do this
 	ld [hli], a
 	; Set the necessary bits to make this non-zero;
