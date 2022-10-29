@@ -46,6 +46,9 @@ hUGE_StartSong::
 	xor a ; Begin by not touching any channels until a note first plays on them.
 	ldh [hUGE_AllowedChannels], a
 
+	ld a, hUGE_NO_WAVE
+	ld [hUGE_LoadedWaveID], a
+
 	ld hl, whUGE.arpState
 	; Set arpeggio state to something.
 	inc a ; ld a, 1
