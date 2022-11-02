@@ -80,7 +80,7 @@
 #define LAST_NOTE 72
 #define ___ 90
 
-typedef void (*hUGERoutine_t)(unsigned char param, unsigned char ch, unsigned char tick) OLDCALL;
+typedef void (*hUGERoutine_t)();
 
 typedef struct hUGEDutyInstr_t {
   const unsigned char sweep;

@@ -130,6 +130,7 @@ ENDC
 	assert whUGE.orderIdx + 1 == whUGE.patternIdx
 	inc hl ; No need to init that
 	assert whUGE.patternIdx + 1 == whUGE.forceRow
+	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 	ld a, -PATTERN_LENGTH
 	ld [hli], a ; Begin by forcing row 0.
 
@@ -217,7 +218,7 @@ hUGE_TickSound::
 	inc [hl]
 	jr nz, .samePattern
 	; Reload index.
-	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2" ; If changing this, look for other instances of `PATTERN_LENGTH`.
+	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 	ld [hl], -PATTERN_LENGTH ; pow2 is required to be able to mask off these two bits.
 IF DEF(PREVIEW_MODE)
 	; If looping is enabled, don't switch patterns.
@@ -246,9 +247,10 @@ ENDC
 .samePattern
 	; Compute the offset into the pattern.
 	ld a, [hli]
+	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 	and PATTERN_LENGTH - 1
 	ld b, a
-	inc a ; Plus two 'cause we read rows backwards. TODO: have the tracker do this
+	inc a ; Plus two 'cause we read rows backwards. TODO: have the tracker do this, but it requires reworking the subpattern code as well!
 	add a, a
 	add a, b
 	ld b, a
@@ -822,8 +824,6 @@ RunTick0Fx:
 	assert whUGEch1.fxParams + 1 == whUGEch1.instrAndFX
 	ld a, [de]
 	and $0F ; Strip instrument bits.
-	cp FX_NOTE_CUT
-	jr z, .hack
 	add a, a ; Each entry in the table is 2 bytes.
 	add a, LOW(Tick0Fx)
 	ld l, a
@@ -832,16 +832,8 @@ RunTick0Fx:
 	ld h, a
 	assert whUGEch1.instrAndFX + 1 == whUGEch1.note
 	inc de
+	; WARNING: `NoteCutTick0Trampoline` assumes that it's jumped to with `a == h`.
 	jp hl
-
-; TODO: this hack is because I couldn't figure out a cleaner way to jump all the way there.
-; I'm sorry.
-; It should be possible to insert this stub somewhere between all the functions by saving three more bytes *somewhere*.
-; The hack doesn't cost much, since it's only run once per tick... but still. :(
-.hack
-	; We're on tick 0, so check for tick 0.
-	xor a
-	jp FxNoteCut.gotTick
 
 
 ; All of the FX functions follow the same calling convention:
@@ -930,7 +922,6 @@ FxSetDutyCycle:
 
 FxPatternBreak:
 	ld a, b
-	or -PATTERN_LENGTH ; TODO: have tracker do this
 	ld [whUGE.forceRow], a
 	ret
 
@@ -1007,7 +998,7 @@ Tick0Fx:
 	jr FxPosJump
 	jr FxSetVolume
 	jr FxPatternBreak
-	No note cut
+	jr NoteCutTick0Trampoline
 FxSetSpeed:
 	ld a, b
 	ld [whUGE.ticksPerRow], a
@@ -1018,8 +1009,6 @@ FxPosJump:
 	; TODO: this should be safe? I think?
 	ld hl, whUGE.orderIdx
 	ld a, b
-	dec a ; TODO: have tracker do this
-	add a, a ; TODO: have tracker do this
 	ld [hli], a
 	; Set the necessary bits to make this non-zero;
 	; if a row is already being forced, this keeps it, but will select row 0 otherwise.
@@ -1129,7 +1118,6 @@ FxArpeggio:
 FxCallRoutine:
 	; Compute pointer to the routine.
 	ld a, b
-	add a, a ; TODO: have tracker do this
 	add a, LOW(whUGE.routines)
 	ld l, a
 	adc a, HIGH(whUGE.routines)
@@ -1139,17 +1127,21 @@ FxCallRoutine:
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
-	; FIXME: use legacy parameters for compatibility for now, but figure out a better way
-	ld a, [whUGE.rowTimer]
-	ld b, a
-	ld a, [whUGE.ticksPerRow]
-IF !DEF(GBDK)
-	sub b
 	jp hl
-ELSE
-	; Wrapper is too big for the `jr`s, but performance isn't a big concern anyway.
-	jp RoutineWrapper
-ENDC
+
+
+; This is a hack to be able to reach `FxNoteCut` from the "tick 0" table.
+NoteCutTick0Trampoline:
+	; The function we're jumping to computes the current tick count (counting upwards; our row timer
+	; instead ticks downwards for performance's sake), and then cuts the note if on the specified tick.
+	; Since we are here, we are on tick 0, so that's what we need `a` to be equal to.
+	; For performance's but moreso size's sake (we're very space-bound here), we can't afford a
+	; `xor a`.
+	; Instead, we rely on this function being called with `a == h` (from `RunTick0Fx`), and jumps to
+	; a `sub h`, which is then used as the tick count.
+	; This is madness, yes, but this is also efficient, and helps compensate the trampoline's
+	; performance penalty.
+	jp FxNoteCut.computeTick
 
 
 ; And these FX are "continuous" only.
@@ -1374,10 +1366,10 @@ FxNoteDelay:
 FxNoteCut:
 	; Should the note be cut now?
 	ld a, [whUGE.rowTimer]
-	ld e, a ; How many ticks are remaining.
+	ld h, a ; How many ticks are remaining.
 	ld a, [whUGE.ticksPerRow]
-	sub e ; How many ticks have elapsed.
-.gotTick
+.computeTick ; WARNING: see comments in `NoteCutTick0Trampoline` about register usage.
+	sub h ; How many ticks have elapsed.
 	cp b
 	ret nz ; Wait until the time is right.
 	; Make sure to disable the subpattern as well.
@@ -1647,15 +1639,4 @@ POPS
 
 IF DEF(GBDK)
 	; TODO: wrappers
-
-RoutineWrapper:
-	sub b ; Missing instruction because the `jp` is too big.
-	push af
-	inc sp
-	push bc ; TODO: what for?
-	call .callHL
-	add sp, 3
-	ret
-.callHL
-	jp hl
 ENDC
