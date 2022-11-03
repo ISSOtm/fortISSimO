@@ -36,11 +36,10 @@ ENDC
 
 ; Note: SDCC's linker is crippled by the lack of alignment support.
 ; So we can't assume any song data nor RAM variables are aligned, as useful as that would be.
+;
+; SDCC calling conventions: https://sdcc.sourceforge.net/doc/sdccman.pdf#subsubsection.4.3.5.1
 
-; @param hl: Pointer to the "song descriptor" to load.
-hUGE_init:: ; For compatibility.
-	ld e, l
-	ld d, h
+_hUGE_StartSong:: ; C interface.
 ; @param de: Pointer to the "song descriptor" to load.
 hUGE_StartSong::
 	xor a ; Begin by not touching any channels until a note first plays on them.
@@ -176,7 +175,7 @@ ENDC
 	ret
 
 
-hUGE_dosound:: ; For compatibility.
+_hUGE_TickSound:: ; C interface.
 hUGE_TickSound::
 	; Disable all muted channels.
 	ld hl, hUGE_MutedChannels
@@ -1550,6 +1549,7 @@ SECTION "hUGE music driver RAM", WRAM0 ; TODO: allow configuring
 
 ; While a channel can be safely tinkered with while muted, if wave RAM is modified,
 ; `hUGE_NO_WAVE` must be written to this variable before unmuting channel 3.
+_hUGE_LoadedWaveID::
 hUGE_LoadedWaveID:: db ; ID of the wave the driver currently has loaded in RAM.
 	DEF hUGE_NO_WAVE equ 100
 	EXPORT hUGE_NO_WAVE
@@ -1624,9 +1624,19 @@ SECTION "hUGE music driver HRAM", HRAM
 ; `hUGE_AllowedChannels` is accessed directly a *lot* in FX code, and the 1-byte save from `ldh`
 ; helps keeping all the code in `jr` range.
 
-; A channel is inhibited as soon as it's muted, but it can only leave that state when playing a note.
-hUGE_MutedChannels:: db ; Bit mask of which channels must be left alone by the driver; but see `hUGE_LoadedWaveID` above.
+
+; As soon as a channel's bit gets set in this variable, the driver will stop updating any of its registers.
+; This is useful, for example, for playing sound effects: temporarily "mute" one of the song's channels,
+; play the SFX on it, and un-mute it to "release" it back to the driver.
+;
+; Note that the driver will not touch the channel until a new note plays on it.
+;
+; IMPORTANT: muting CH3 (the wave channel) requires special attention: if wave RAM is modified, you
+;            must set `hUGE_LoadedWaveID` to `hUGE_NO_WAVE` before unmuting the channel.
+_hUGE_MutedChannels:: ; C interface.
+hUGE_MutedChannels:: db
 hUGE_AllowedChannels: db ; Bit mask of which channels the driver is allowed to use.
+
 ; The two variables above use these masks.
 	DEF hUGE_CH1_MASK equ 1 << 0
 	DEF hUGE_CH2_MASK equ 1 << 1
@@ -1635,8 +1645,3 @@ hUGE_AllowedChannels: db ; Bit mask of which channels the driver is allowed to u
 	EXPORT hUGE_CH1_MASK, hUGE_CH2_MASK, hUGE_CH3_MASK, hUGE_CH4_MASK
 
 POPS
-
-
-IF DEF(GBDK)
-	; TODO: wrappers
-ENDC
