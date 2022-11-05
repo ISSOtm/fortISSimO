@@ -42,14 +42,15 @@ ENDC
 _hUGE_StartSong:: ; C interface.
 ; @param de: Pointer to the "song descriptor" to load.
 hUGE_StartSong::
+	ld hl, hUGE_LoadedWaveID
+	ld a, hUGE_NO_WAVE
+	ld [hli], a
+
 	xor a ; Begin by not touching any channels until a note first plays on them.
 	ldh [hUGE_AllowedChannels], a
 
-	ld a, hUGE_NO_WAVE
-	ld [hUGE_LoadedWaveID], a
-
-	ld hl, whUGE.arpState
 	; Set arpeggio state to something.
+	assert hUGE_LoadedWaveID + 1 == whUGE.arpState
 	inc a ; ld a, 1
 	ld [hli], a
 
@@ -1521,7 +1522,7 @@ ELSE
 	ret
 ENDC
 
-; @param de: Pointer to the channel's FX params.
+; @param hl: Pointer to the channel's FX params.
 ; @param c:  The channel's ID (0 for CH1, 1 for CH2, etc.)
 ; @destroy a bc de hl (potentially)
 .runFx
