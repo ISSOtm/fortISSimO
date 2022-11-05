@@ -1034,7 +1034,6 @@ FxSetVolume:
 	xor 4 ; 0, 5, F
 	add a, LOW(rNR12)
 	ld c, a
-	swap b ; TODO: have tracker do this
 	; FIXME: hUGEDriver preserves envelope bits for pulse channels, but not for CH4;
 	;        according to Coffee Bat, the envelope bits should be preserved if B's lower nibble
 	;        (post-`swap`) is non-zero. Decide on a behaviour, and implement it.
@@ -1052,11 +1051,11 @@ FxSetVolume:
 	; "Quantize" the more finely grained volume control down to one of 4 values.
 	; FIXME: this is not very linear
 	ld a, b
-	cp 10
+	cp 10 << 4
 	jr nc, .one
-	cp 5
+	cp 5 << 4
 	jr nc, .two
-	or a
+	and $F0 ; Discard the envelope bits (which are irrelevant to CH3).
 	jr z, .done ; Zero maps to zero.
 .three:
 	ld a, AUD3LEVEL_25

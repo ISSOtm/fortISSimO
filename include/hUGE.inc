@@ -28,7 +28,7 @@ MACRO dn
     ELIF FX == FX_POS_JUMP
         def FX_ARG = (FX_ARG - 1) * 2 ; This is 1-based in the tracker. Convert to `orderIdx` format.
     ELIF FX == FX_SET_VOLUME
-        ; TODO: the possible transformations are channel-independent, but we don't have that info.
+        def FX_ARG = LOW(FX_ARG << 4) | FX_ARG >> 4 ; Swap the two nibbles to match NRx2 format.
     ELIF FX == FX_PATTERN_BRK
         assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
         def FX_ARG |= -PATTERN_LENGTH ; Convert to `forceRow` format.
