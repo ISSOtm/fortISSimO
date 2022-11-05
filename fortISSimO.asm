@@ -873,17 +873,7 @@ FxResetVibCounter:
 	ret
 
 
-FxSetMasterVolume:
-	ld a, b ; Read the FX's params.
-	ldh [rNR50], a
-	ret
-
-
-FxSetPanning:
-	ld a, b ; Read the FX's params.
-	ldh [rNR51], a
-	ret
-
+; This one is slightly out of order so it can `jr LoadWave.waveInA`.
 
 ; For CH1 and CH2, this is written as-is to NRx1;
 ; for CH3, this is the ID of the wave to load;
@@ -900,7 +890,7 @@ FxSetDutyCycle:
 	jr c, .ch2
 	rra
 	ld a, b ; Read the FX's params.
-	jp c, LoadWave.waveInA ; TODO: if this could be made into a `jr` it would be pog
+	jr c, LoadWave.waveInA
 .ch4
 	; Keep the polynom bits, but replace the LFSR width bit.
 	ldh a, [rNR43]
@@ -917,6 +907,21 @@ FxSetDutyCycle:
 	ld a, b
 	ldh [rNR21], a
 	ret
+
+
+FxSetMasterVolume:
+	ld a, b ; Read the FX's params.
+	ldh [rNR50], a
+	ret
+
+
+FxSetPanning:
+	ld a, b ; Read the FX's params.
+	ldh [rNR51], a
+	ret
+
+
+; FxSetDutyCycle is a bit above.
 
 
 FxPatternBreak:
