@@ -672,7 +672,7 @@ PlayWaveNote:
 	ld a, [hUGE_LoadedWaveID]
 	cp e
 	call nz, LoadWave
-	db $C4 ; call nz, <res 7, [hl]>
+	db $21 ; ld hl, <res 7, [hl]> ; This is OK because HL does not get used below.
 .noWaveInstr
 	res 7, [hl] ; If no instrument, remove trigger bit from control mask.
 
@@ -782,7 +782,6 @@ PlayNoiseNote:
 
 
 ; @param e: The ID of the wave to load.
-; @return zero: Set.
 ; @destroy hl a
 LoadWave:
 	; Compute a pointer to the wave.
@@ -808,7 +807,6 @@ LoadWave:
 	ENDR
 	ld a, AUD3ENA_ON
 	ldh [rNR30], a ; Re-enable CH3's DAC.
-	xor a
 	ret
 
 
@@ -1285,7 +1283,7 @@ FxVibrato:
 	ldh [c], a
 	ret
 
-.noUnderflow ; TODO: merge back?
+.noUnderflow
 	ld [hl], a
 	ret
 
