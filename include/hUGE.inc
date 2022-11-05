@@ -29,6 +29,10 @@ MACRO dn
         def FX_ARG = (FX_ARG - 1) * 2 ; This is 1-based in the tracker. Convert to `orderIdx` format.
     ELIF FX == FX_SET_VOLUME
         def FX_ARG = LOW(FX_ARG << 4) | FX_ARG >> 4 ; Swap the two nibbles to match NRx2 format.
+        IF FX_ARG & $0F != 0 && FX_ARG & $F8 == 0
+            ; We will kill the channel! Let's mute it but avoid that.
+            def FX_ARG = $08 ; Set the volume to 0, but keep the channel alive to avoid a pop.
+        ENDC
     ELIF FX == FX_PATTERN_BRK
         assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
         def FX_ARG |= -PATTERN_LENGTH ; Convert to `forceRow` format.

@@ -960,7 +960,7 @@ FxVolumeSlide:
 	jr nc, :+
 	ld a, b ; Clamp.
 :
-	; TODO: this only needs to apply when a = 0, which is clamping... plus Z on the `sub`.
+	; TODO: this only needs to apply when a = 0, which is equivalent to clamping... or Z on the `sub`.
 	or AUDENV_UP ; Ensure that writing $00 does *not* kill the channel (reduces pops).
 .applyVolume
 	ldh [c], a ; Yes, this kills the envelope, but we must retrigger, which sounds bad with envelope anyway.
@@ -1067,6 +1067,7 @@ FxSetVolume:
 	ld a, AUD3LEVEL_100
 .done:
 	ldh [rAUD3LEVEL], a
+	; CH3 doesn't need a retrigger after writing to NR32.
 	ret
 
 
