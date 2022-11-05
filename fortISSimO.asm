@@ -71,7 +71,6 @@ hUGE_StartSong::
 	ld b, a
 	inc de
 	ld a, [bc]
-	; TODO: this transform is probably wrong
 	; TODO: have tracker do this
 	sub 2
 	ld [hli], a
@@ -204,9 +203,9 @@ hUGE_TickSound::
 	ld a, [whUGE.ticksPerRow]
 	ld [hli], a ; TODO: loose
 
-	; TODO: check if there is a row or pattern break, and act accordingly
+	; Check if there is a row or pattern break, and act accordingly:
 	; Pattern break + row break at the same time must switch to row R on pattern P!
-	; But row break on last row must not change the pattern
+	; But row break on last row must not change the pattern.
 
 	; Switch to next row.
 	ld hl, whUGE.forceRow
@@ -474,7 +473,7 @@ TickSubpattern:
 ; @destroy e a
 ReadRow:
 	; Compute the pointer to the current pattern.
-	ld a, [whUGE.orderIdx] ; TODO: cache this in a reg?
+	ld a, [whUGE.orderIdx] ; TODO: cache this in a reg across calls?
 	add a, [hl]
 	ld e, a
 	inc hl
@@ -1010,7 +1009,8 @@ FxSetSpeed:
 
 
 FxPosJump:
-	; TODO: this should be safe? I think?
+	; Writing to `orderIdx` directly is safe, because it is only read by `ReadRow`,
+	; all calls to which happen before any FX processing. (The rows are cached in RAM.)
 	ld hl, whUGE.orderIdx
 	ld a, b
 	ld [hli], a
@@ -1234,7 +1234,7 @@ ContinuousFx:
 	No pos jump
 	No set volume
 	No pattern break
-	jr FxNoteCut ; TODO: can use a single-byte instruction and `db $FE` to skip `ret` below
+	jr FxNoteCut
 	ret ; No set speed.
 
 
@@ -1305,8 +1305,6 @@ FxTonePorta:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Load the target period.
-	; TODO: reading by increasing HL might lead to better reg usage; however,
-	;       changing this code might introduce more bugs, so do this once everything else works.
 	ld hl, whUGEch1.portaTarget + 1 - whUGEch1.note
 	add hl, de
 	ld a, [hld]
@@ -1364,7 +1362,7 @@ FxNoteDelay:
 	set 2, c ; 05
 :
 	set 4, c ; 10 / 15
-	jp PlayDutyNote ; TODO: `jr`/fallthrough this?
+	jp PlayDutyNote
 
 
 FxNoteCut:
