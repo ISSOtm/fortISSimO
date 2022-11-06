@@ -28,6 +28,10 @@ IF DEF(PREVIEW_MODE)
 	DEF TAKE_REG_SNAPSHOT equs "db $f4" ; Signal tracker to take a snapshot of audio regs (for VGM export).
 	DEF REFRESH_ORDER equs "db $fc" ; Signal tracker to re-read the order index.
 	DEF REFRESH_ROW equs "db $fd" ; Signal tracker to re-read the row index.
+
+	WARN "CAUTION: Using fortISSimO inside hUGETracker itself is experimental.\n\tPlease report any issues to\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<"
+
+	SECTION "Sound Driver", ROM0
 ELSE
 	DEF TAKE_REG_SNAPSHOT equs ""
 	DEF REFRESH_ORDER equs ""
@@ -116,21 +120,31 @@ hUGE_StartSong::
 	jr nz, .copyPointers
 
 IF DEF(PREVIEW_MODE)
-	assert wWaves + 2 == wLoopPatterns
+	assert wWaves + 2 == loop_order
 	inc hl ; TODO: does `loopPatterns` need to be init'd?
-	assert wLoopPatterns + 1 == wOrderIdx
+	assert loop_order + 1 == wOrderIdx
 ELSE
 	assert wWaves + 2 == wOrderIdx
 ENDC
 
 	; Orders begin at 0
 	xor a
+IF DEF(PREVIEW_MODE)
+	inc hl ; The tracker writes the starting order instead.
+	assert wOrderIdx == current_order
+ELSE
 	ld [hli], a
+ENDC
 	assert wOrderIdx + 1 == wPatternIdx
-	inc hl ; No need to init that
+	inc hl ; No need to init that, it will be set from `wForceRow`.
 	assert wPatternIdx + 1 == wForceRow
 	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
+IF DEF(PREVIEW_MODE)
+	ld a, [row]
+	or -PATTERN_LENGTH
+ELSE
 	ld a, -PATTERN_LENGTH
+ENDC
 	ld [hli], a ; Begin by forcing row 0.
 
 	; Time to init the channels!
@@ -221,7 +235,7 @@ hUGE_TickSound::
 	ld [hl], -PATTERN_LENGTH ; pow2 is required to be able to mask off these two bits.
 IF DEF(PREVIEW_MODE)
 	; If looping is enabled, don't switch patterns.
-	ld a, [wLoopPatterns]
+	ld a, [loop_order]
 	and a
 	jr nz, .samePattern
 ENDC
@@ -315,13 +329,7 @@ ENDC
 	call RunTick0Fx
 	ld hl, wCH4.ctrlMask
 	ld c, hUGE_CH4_MASK
-IF !DEF(PREVIEW_MODE)
 	assert @ == TickSubpattern ; fallthrough
-ELSE
-	call TickSubpattern
-	TAKE_REG_SNAPSHOT
-	ret
-ENDC
 
 
 ; @param hl: Pointer to the channel's "control mask".
@@ -1513,14 +1521,7 @@ ContinueFx: ; TODO: if this is short enough, swapping it with the other path may
 	call .runFx
 	ld hl, wCH4.ctrlMask
 	ld c, hUGE_CH4_MASK
-IF !DEF(PREVIEW_MODE)
 	jp TickSubpattern
-ELSE
-	call TickSubpattern
-
-	TAKE_REG_SNAPSHOT
-	ret
-ENDC
 
 ; @param hl: Pointer to the channel's FX params.
 ; @param c:  The channel's ID (0 for CH1, 1 for CH2, etc.)
@@ -1575,9 +1576,9 @@ wWaves: dw
 ; Global variables.
 
 IF DEF(PREVIEW_MODE)
-wLoopPatterns: db ; If non-zero, instead of falling through to the next pattern, loop the current one.
+loop_order: db ; If non-zero, instead of falling through to the next pattern, loop the current one.
+current_order:
 ENDC
-
 wOrderIdx: db ; Index into the orders, *in bytes*.
 wPatternIdx: db ; Index into the current patterns, with the two high bits set.
 wForceRow: db ; If non-zero, will be written (verbatim) to `patternIdx` on the next tick 0, bypassing the increment.
@@ -1645,3 +1646,50 @@ hUGE_AllowedChannels: db ; Bit mask of which channels the driver is allowed to u
 	EXPORT hUGE_CH1_MASK, hUGE_CH2_MASK, hUGE_CH3_MASK, hUGE_CH4_MASK
 
 POPS
+
+IF DEF(PREVIEW_MODE)
+	hUGE_init::
+		ld d, h
+		ld e, l
+		jp hUGE_StartSong
+
+	hUGE_dosound::
+		; Check if the tracker requested a row break.
+		ld a, [row_break]
+		and a
+		jr z, .noBreak
+		dec a
+		assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
+		or -PATTERN_LENGTH
+		ld [wForceRow], a
+		xor a
+		ld [row_break], a
+	.noBreak
+
+		ld a, [next_order]
+		and a
+		jr z, .noOrderChange
+		dec a
+		add a, a
+		ld [wOrderIdx], a
+		xor a
+		ld [next_order], a
+	.noOrderChange
+
+		call hUGE_TickSound
+		TAKE_REG_SNAPSHOT
+
+		; Convert row info to the format the tracker expects.
+		ld a, [wPatternIdx]
+		assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
+		and PATTERN_LENGTH - 1
+		ld [row], a
+		REFRESH_ROW
+		ret
+
+	SECTION "Preview variables", WRAM0
+
+	row: db
+	row_break: db
+	next_order: db
+ENDC

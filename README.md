@@ -35,8 +35,23 @@ I am for that to be the case, anyway; please feel free to report any incompatibi
    ```bash
    rgb2sdas fortISSimO.obj
    ```
-3. Use `#include <hUGEDriver.h>` (you may need to adapt that path and/or use `-I`) as desired.
+3. Use `#include <fortISSimO.h>` (you may need to adapt that path and/or use `-I`) as desired.
 4. Link `fortISSimO.obj.o` as part of your build.
+
+## Using within hUGETracker
+
+hUGEDriver can be used within hUGETracker!
+To do so:
+
+0. Optionally (but recommended), back up the files you are about to overwrite.
+1. Find the `hUGEDriver/` directory in your hUGETracker installation.
+2. In that directory, replace `hUGEDriver.asm` by `fortISSimO.asm` (make sure to rename it to `hUGEDriver.asm`), **and also** replace `hUGE.inc` with fortISSimO's—otherwise your song will break!!
+
+Note that this is **experimental** and **not supported by hUGETracker**.
+**Any troubles** encountered while using fortISSimO in hUGETracker should be reported **here**.
+
+hUGETracker *might* lock up and/or crash during playback, so it's advisable to save often.
+Please only use hUGETracker 1.0b10: earlier versions are just not compatible, and later versions may or may not be.
 
 ## License
 
