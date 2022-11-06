@@ -50,20 +50,20 @@ hUGE_StartSong::
 	ldh [hUGE_AllowedChannels], a
 
 	; Set arpeggio state to something.
-	assert hUGE_LoadedWaveID + 1 == whUGE.arpState
+	assert hUGE_LoadedWaveID + 1 == wArpState
 	inc a ; ld a, 1
 	ld [hli], a
 
-	assert whUGE.arpState + 1 == whUGE.rowTimer
+	assert wArpState + 1 == wRowTimer
 	; a = 1
 	ld [hli], a ; The next playback will be tick 0.
 
-	assert whUGE.rowTimer + 1 == whUGE.ticksPerRow
+	assert wRowTimer + 1 == wTicksPerRow
 	ld a, [de]
 	ld [hli], a
 	inc de
 
-	assert whUGE.ticksPerRow + 1 == whUGE.lastPatternIdx
+	assert wTicksPerRow + 1 == wLastPatternIdx
 	; TODO: pointing to a single byte is a bit silly
 	ld a, [de]
 	ld c, a
@@ -78,35 +78,35 @@ hUGE_StartSong::
 
 	; TODO: change the order around to make loading this more efficient
 	ld a, [de]
-	ld [whUGEch1.order], a
+	ld [wCH1.order], a
 	inc de
 	ld a, [de]
-	ld [whUGEch1.order + 1], a
+	ld [wCH1.order + 1], a
 	inc de
 	ld a, [de]
-	ld [whUGEch2.order], a
+	ld [wCH2.order], a
 	inc de
 	ld a, [de]
-	ld [whUGEch2.order + 1], a
+	ld [wCH2.order + 1], a
 	inc de
 	ld a, [de]
-	ld [whUGEch3.order], a
+	ld [wCH3.order], a
 	inc de
 	ld a, [de]
-	ld [whUGEch3.order + 1], a
+	ld [wCH3.order + 1], a
 	inc de
 	ld a, [de]
-	ld [whUGEch4.order], a
+	ld [wCH4.order], a
 	inc de
 	ld a, [de]
-	ld [whUGEch4.order + 1], a
+	ld [wCH4.order + 1], a
 	; No `inc de` because the loop pre-increments
 
-	assert whUGE.lastPatternIdx + 1 == whUGE.dutyInstrs
-	assert whUGE.dutyInstrs + 2 == whUGE.waveInstrs
-	assert whUGE.waveInstrs + 2 == whUGE.noiseInstrs
-	assert whUGE.noiseInstrs + 2 == whUGE.routines
-	assert whUGE.routines + 2 == whUGE.waves
+	assert wLastPatternIdx + 1 == wDutyInstrs
+	assert wDutyInstrs + 2 == wWaveInstrs
+	assert wWaveInstrs + 2 == wNoiseInstrs
+	assert wNoiseInstrs + 2 == wRoutines
+	assert wRoutines + 2 == wWaves
 	ld c, 2 + 2 + 2 + 2 + 2
 .copyPointers
 	inc de
@@ -116,35 +116,35 @@ hUGE_StartSong::
 	jr nz, .copyPointers
 
 IF DEF(PREVIEW_MODE)
-	assert whUGE.waves + 2 == whUGE.loopPatterns
+	assert wWaves + 2 == wLoopPatterns
 	inc hl ; TODO: does `loopPatterns` need to be init'd?
-	assert whUGE.loopPatterns + 1 == whUGE.orderIdx
+	assert wLoopPatterns + 1 == wOrderIdx
 ELSE
-	assert whUGE.waves + 2 == whUGE.orderIdx
+	assert wWaves + 2 == wOrderIdx
 ENDC
 
 	; Orders begin at 0
 	xor a
 	ld [hli], a
-	assert whUGE.orderIdx + 1 == whUGE.patternIdx
+	assert wOrderIdx + 1 == wPatternIdx
 	inc hl ; No need to init that
-	assert whUGE.patternIdx + 1 == whUGE.forceRow
+	assert wPatternIdx + 1 == wForceRow
 	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 	ld a, -PATTERN_LENGTH
 	ld [hli], a ; Begin by forcing row 0.
 
 	; Time to init the channels!
-	assert whUGE.forceRow + 1 == whUGEch1
+	assert wForceRow + 1 == wCH1
 	ld c, 4
 .initChannel
-	assert whUGEch1 == whUGEch1.order ; The order pointer was already written above
+	assert wCH1 == wCH1.order ; The order pointer was already written above
 	inc hl ; Skip order pointer.
 	inc hl
 	; All of these don't need to be init'd.
-	assert whUGEch1.order + 2 == whUGEch1.fxParams
-	assert whUGEch1.fxParams + 1 == whUGEch1.instrAndFX
-	assert whUGEch1.instrAndFX + 1 == whUGEch1.note
-	assert whUGEch1.note + 1 == whUGEch1.subPattern
+	assert wCH1.order + 2 == wCH1.fxParams
+	assert wCH1.fxParams + 1 == wCH1.instrAndFX
+	assert wCH1.instrAndFX + 1 == wCH1.note
+	assert wCH1.note + 1 == wCH1.subPattern
 	inc hl ; Skip FX params.
 	inc hl ; Skip instrument/FX byte.
 	inc hl ; Skip note ID.
@@ -154,11 +154,11 @@ ENDC
 	xor a
 	ld [hli], a
 	ld [hli], a
-	assert whUGEch1.subPattern + 2 == whUGEch1.subPatternRow
+	assert wCH1.subPattern + 2 == wCH1.subPatternRow
 	; Although strictly speaking, init'ing the subpattern row is unnecessary, it's still read before
 	; the NULL check is performed; doing this silences any spurious "uninit'd RAM read" exceptions.
 	ld [hli], a
-	assert whUGEch1.subPatternRow + 1 == whUGEch1.ctrlMask
+	assert wCH1.subPatternRow + 1 == wCH1.ctrlMask
 	; Same as above.
 	ld [hli], a
 	; Then, we have the the 5 channel-dependent bytes
@@ -185,13 +185,13 @@ hUGE_TickSound::
 	and [hl]
 	ld [hl], a
 
-	ld hl, whUGE.arpState
+	ld hl, wArpState
 	dec [hl]
 	jr nz, :+
 	ld [hl], 3
 :
 	inc hl
-	assert whUGE.arpState + 1 == whUGE.rowTimer
+	assert wArpState + 1 == wRowTimer
 
 	; Check if we should switch to a new row, or just update "continuous" effects.
 	dec [hl]
@@ -201,7 +201,7 @@ hUGE_TickSound::
 	;; This is the first tick; switch to the next row, and reload all pointers.
 
 	; Reload delay.
-	ld a, [whUGE.ticksPerRow]
+	ld a, [wTicksPerRow]
 	ld [hli], a ; TODO: loose
 
 	; Check if there is a row or pattern break, and act accordingly:
@@ -209,9 +209,9 @@ hUGE_TickSound::
 	; But row break on last row must not change the pattern.
 
 	; Switch to next row.
-	ld hl, whUGE.forceRow
+	ld hl, wForceRow
 	ld a, [hld]
-	assert whUGE.forceRow - 1 == whUGE.patternIdx
+	assert wForceRow - 1 == wPatternIdx
 	and a
 	jr nz, .forceRow
 	inc [hl]
@@ -221,14 +221,14 @@ hUGE_TickSound::
 	ld [hl], -PATTERN_LENGTH ; pow2 is required to be able to mask off these two bits.
 IF DEF(PREVIEW_MODE)
 	; If looping is enabled, don't switch patterns.
-	ld a, [whUGE.loopPatterns]
+	ld a, [wLoopPatterns]
 	and a
 	jr nz, .samePattern
 ENDC
 	; Switch to next patterns.
 	dec hl
-	assert whUGE.patternIdx - 1 == whUGE.orderIdx
-	ld a, [whUGE.lastPatternIdx]
+	assert wPatternIdx - 1 == wOrderIdx
+	ld a, [wLastPatternIdx]
 	sub [hl]
 	jr z, .wrapOrders ; Reached end of orders, start again from the beginning.
 	ld a, [hl]
@@ -238,7 +238,7 @@ ENDC
 .wrapOrders
 	ld [hli], a
 	REFRESH_ORDER
-	assert whUGE.orderIdx + 1 == whUGE.patternIdx
+	assert wOrderIdx + 1 == wPatternIdx
 	db $FE ; cp <ld [hl], a>
 .forceRow
 	ld [hl], a
@@ -254,7 +254,7 @@ ENDC
 	add a, b
 	ld b, a
 	; Reset the "force row" byte.
-	assert whUGE.patternIdx + 1 == whUGE.forceRow
+	assert wPatternIdx + 1 == wForceRow
 	xor a
 	ld [hli], a
 
@@ -263,57 +263,57 @@ ENDC
 
 	; Note that all of these functions leave b untouched all the way until CH4's `ReadRow`!
 
-	assert whUGE.forceRow + 1 == whUGEch1.order
-	; ld hl, whUGEch1.order
+	assert wForceRow + 1 == wCH1.order
+	; ld hl, wCH1.order
 	call ReadRow
-	ld hl, whUGEch1.instrAndFX
+	ld hl, wCH1.instrAndFX
 	ld e, hUGE_CH1_MASK
 	ld c, LOW(rNR10)
 	call nz, PlayDutyNote
 
-	ld hl, whUGEch2.order
+	ld hl, wCH2.order
 	call ReadRow
-	ld hl, whUGEch2.instrAndFX
+	ld hl, wCH2.instrAndFX
 	ld e, hUGE_CH2_MASK
 	ld c, LOW(rNR21 - 1) ; NR20 doesn't exist.
 	call nz, PlayDutyNote
 
-	ld hl, whUGEch3.order
+	ld hl, wCH3.order
 	call ReadRow
 	call nz, PlayWaveNote
 
-	ld hl, whUGEch4.order
+	ld hl, wCH4.order
 	call ReadRow
 	call nz, PlayNoiseNote
 
 
 	;; Process tick 0 FX and subpatterns.
 
-	ld de, whUGEch1.fxParams
+	ld de, wCH1.fxParams
 	ld c, hUGE_CH1_MASK
 	call RunTick0Fx
-	ld hl, whUGEch1.ctrlMask
+	ld hl, wCH1.ctrlMask
 	ld c, hUGE_CH1_MASK
 	call TickSubpattern
 
-	ld de, whUGEch2.fxParams
+	ld de, wCH2.fxParams
 	ld c, hUGE_CH2_MASK
 	call RunTick0Fx
-	ld hl, whUGEch2.ctrlMask
+	ld hl, wCH2.ctrlMask
 	ld c, hUGE_CH2_MASK
 	call TickSubpattern
 
-	ld de, whUGEch3.fxParams
+	ld de, wCH3.fxParams
 	ld c, hUGE_CH3_MASK
 	call RunTick0Fx
-	ld hl, whUGEch3.ctrlMask
+	ld hl, wCH3.ctrlMask
 	ld c, hUGE_CH3_MASK
 	call TickSubpattern
 
-	ld de, whUGEch4.fxParams
+	ld de, wCH4.fxParams
 	ld c, hUGE_CH4_MASK
 	call RunTick0Fx
-	ld hl, whUGEch4.ctrlMask
+	ld hl, wCH4.ctrlMask
 	ld c, hUGE_CH4_MASK
 IF !DEF(PREVIEW_MODE)
 	assert @ == TickSubpattern ; fallthrough
@@ -332,19 +332,19 @@ TickSubpattern:
 	ld a, [hld] ; Read the "control mask".
 	res 7, a ; We don't want to retrigger the channel.
 	ld b, a
-	assert whUGEch1.ctrlMask - 1 == whUGEch1.subPatternRow
+	assert wCH1.ctrlMask - 1 == wCH1.subPatternRow
 	ld a, [hl]
 	ld e, a
 	add a, 3 ; Switch to next row.
 	ld [hld], a
-	assert whUGEch1.subPatternRow - 2 == whUGEch1.subPattern ; 16-bit variable.
+	assert wCH1.subPatternRow - 2 == wCH1.subPattern ; 16-bit variable.
 	; Add the row offset to the subpattern base pointer.
 	ld a, [hld]
 	ld d, a
 	or [hl]
 	ret z ; Return if subpattern pointer is NULL (no subpattern).
 	ld a, [hld]
-	assert whUGEch1.subPattern - 1 == whUGEch1.note
+	assert wCH1.subPattern - 1 == wCH1.note
 	push hl ; Save pointer to current note.
 	add a, e
 	ld e, a ; Can't write directly to l, as we need to deref hl just below.
@@ -414,7 +414,7 @@ TickSubpattern:
 	add a, a
 	add a, l
 	; Jump to the selected row.
-	ld hl, whUGEch1.subPatternRow - whUGEch1.note
+	ld hl, wCH1.subPatternRow - wCH1.note
 	add hl, de
 	ld [hl], a
 	pop hl
@@ -439,7 +439,7 @@ TickSubpattern:
 .ch4
 	call GetNoisePolynom
 	ld d, a
-	ld a, [whUGEch4.lfsrWidth]
+	ld a, [wCH4.lfsrWidth]
 	or d
 	ldh [rNR43], a
 	ld a, b
@@ -474,14 +474,14 @@ TickSubpattern:
 ; @destroy e a
 ReadRow:
 	; Compute the pointer to the current pattern.
-	ld a, [whUGE.orderIdx] ; TODO: cache this in a reg across calls?
+	ld a, [wOrderIdx] ; TODO: cache this in a reg across calls?
 	add a, [hl]
 	ld e, a
 	inc hl
 	ld a, [hli]
 	adc a, 0
 	ld d, a
-	assert whUGEch1.order + 2 == whUGEch1.fxParams
+	assert wCH1.order + 2 == wCH1.fxParams
 	; Compute the pointer to the current row.
 	ld a, [de]
 	add a, b
@@ -496,12 +496,12 @@ ReadRow:
 	ld a, [de]
 	ld [hli], a
 	dec de
-	assert whUGEch1.fxParams + 1 == whUGEch1.instrAndFX
+	assert wCH1.fxParams + 1 == wCH1.instrAndFX
 	ld a, [de]
 	ld [hli], a
 	ld c, a
 	dec de
-	assert whUGEch1.instrAndFX + 1 == whUGEch1.note
+	assert wCH1.instrAndFX + 1 == wCH1.note
 	ld a, [de]
 	ld d, a
 	; If the row is a rest, don't play it.
@@ -537,7 +537,7 @@ PlayDutyNote:
 	; First, apply the instrument.
 	ld a, [hli]
 	inc hl
-	assert whUGEch1.instrAndFX + 2 == whUGEch1.subPattern
+	assert wCH1.instrAndFX + 2 == wCH1.subPattern
 	and $F0 ; Keep the instrument bits.
 	jr z, .noInstr
 	; Compute the instrument pointer.
@@ -550,10 +550,10 @@ PlayDutyNote:
 	rra ; *2 now.
 	add a, e ; *2 + *4 = *6, perfect!
 	ld e, a
-	ld a, [whUGE.dutyInstrs]
+	ld a, [wDutyInstrs]
 	add a, e
 	ld e, a
-	ld a, [whUGE.dutyInstrs + 1]
+	ld a, [wDutyInstrs + 1]
 	adc a, 0
 	ld d, a
 	; Perform the instrument's writes.
@@ -573,15 +573,15 @@ PlayDutyNote:
 	inc de
 	ld a, [de]
 	ld [hli], a
-	assert whUGEch1.subPattern + 2 == whUGEch1.subPatternRow
+	assert wCH1.subPattern + 2 == wCH1.subPatternRow
 	inc de
 	xor a ; Subpattern row counter.
 	ld [hli], a
-	assert whUGEch1.subPatternRow + 1 == whUGEch1.ctrlMask
+	assert wCH1.subPatternRow + 1 == wCH1.ctrlMask
 	ld a, [de] ; NRx4 mask.
 .writeCtrlMask
 	ld [hli], a
-	assert whUGEch1.ctrlMask + 1 == whUGEch1.period
+	assert wCH1.ctrlMask + 1 == wCH1.period
 	inc c ; Skip NRx2.
 
 	; Next, apply the note.
@@ -602,7 +602,7 @@ PlayDutyNote:
 	ld a, [de] ; HIGH(Period).
 	ld [hld], a
 	dec hl
-	assert whUGEch1.period - 1 == whUGEch1.ctrlMask
+	assert wCH1.period - 1 == wCH1.ctrlMask
 	or [hl] ; OR the "control bits" with the period's high bits.
 	ldh [c], a
 	ret
@@ -632,9 +632,9 @@ PlayWaveNote:
 	ldh [hUGE_AllowedChannels], a
 
 	; First, apply the instrument.
-	ld a, [whUGEch3.instrAndFX]
+	ld a, [wCH3.instrAndFX]
 	and $F0 ; Keep the instrument bits.
-	ld hl, whUGEch3.ctrlMask
+	ld hl, wCH3.ctrlMask
 	jr z, .noWaveInstr
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
@@ -646,7 +646,7 @@ PlayWaveNote:
 	rra ; *2 now.
 	add a, e ; *2 + *4 = *6, perfect!
 	ld e, a
-	ld hl, whUGE.waveInstrs
+	ld hl, wWaveInstrs
 	ld a, [hli]
 	add a, e
 	ld e, a
@@ -662,13 +662,13 @@ PlayWaveNote:
 	ld a, [hli] ; Read wave ID for later. TODO: move it last!
 	ld e, a
 	ld a, [hli] ; Subpattern pointer.
-	ld [whUGEch3.subPattern], a
+	ld [wCH3.subPattern], a
 	ld a, [hli]
-	ld [whUGEch3.subPattern + 1], a
+	ld [wCH3.subPattern + 1], a
 	xor a ; Subpattern row counter.
-	ld [whUGEch3.subPatternRow], a
+	ld [wCH3.subPatternRow], a
 	ld a, [hl] ; NRx4 mask.
-	ld [whUGEch3.ctrlMask], a
+	ld [wCH3.ctrlMask], a
 	; Check if a new wave must be loaded.
 	ld a, [hUGE_LoadedWaveID]
 	cp e
@@ -692,7 +692,7 @@ PlayWaveNote:
 	ld [hl], l ; This has bit 7 reset, killing the channel.
 	ld [hl], h ; This has bit 7 set, re-enabling the channel.
 	; Write it.
-	ld hl, whUGEch3.period
+	ld hl, wCH3.period
 	ld a, [de] ; LOW(Period).
 	ld [hli], a
 	inc de
@@ -700,7 +700,7 @@ PlayWaveNote:
 	ld a, [de] ; HIGH(Period).
 	ld [hld], a
 	dec hl
-	assert whUGEch3.period - 1 == whUGEch3.ctrlMask
+	assert wCH3.period - 1 == wCH3.ctrlMask
 	or [hl] ; OR the "control bits" with the period's high bits.
 	ldh [rNR34], a
 	ret
@@ -718,9 +718,9 @@ PlayNoiseNote:
 	ldh [hUGE_AllowedChannels], a
 
 	; First, apply the instrument.
-	ld a, [whUGEch4.instrAndFX]
+	ld a, [wCH4.instrAndFX]
 	and $F0 ; Keep the instrument bits.
-	ld hl, whUGEch4.ctrlMask
+	ld hl, wCH4.ctrlMask
 	jr z, .noNoiseInstr
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
@@ -733,7 +733,7 @@ PlayNoiseNote:
 	rra ; *2 now.
 	add a, e ; *2 + *4 = *6, perfect!
 	ld e, a
-	ld hl, whUGE.noiseInstrs
+	ld hl, wNoiseInstrs
 	ld a, [hli]
 	add a, e
 	ld e, a
@@ -745,11 +745,11 @@ PlayNoiseNote:
 	ld a, [hli] ; Volume & envelope.
 	ldh [rNR42], a
 	ld a, [hli] ; Subpattern pointer.
-	ld [whUGEch4.subPattern], a
+	ld [wCH4.subPattern], a
 	ld a, [hli]
-	ld [whUGEch4.subPattern + 1], a
+	ld [wCH4.subPattern + 1], a
 	xor a ; Subpattern row counter.
-	ld [whUGEch4.subPatternRow], a
+	ld [wCH4.subPatternRow], a
 	ld a, [hl] ; LFSR width & length bit & length.
 	and $3F ; Only keep the length bits.
 	ldh [rNR41], a
@@ -759,10 +759,10 @@ PlayNoiseNote:
 	rlca ; LFSR width is in bit 0 and carry now.
 	srl a ; LFSR width is in carry, and a contains only the length enable in bit 6.
 	set 7, a ; Set trigger bit.
-	ld [whUGEch4.ctrlMask], a
+	ld [wCH4.ctrlMask], a
 	sbc a, a ; All bits are LFSR width now.
 	and AUD4POLY_7STEP
-	ld [whUGEch4.lfsrWidth], a
+	ld [wCH4.lfsrWidth], a
 	db $DC ; call c, <res 7, [hl]>
 .noNoiseInstr
 	res 7, [hl] ; If no instrument, remove trigger bit from control mask.
@@ -770,13 +770,13 @@ PlayNoiseNote:
 	; Next, apply the note.
 	ld a, d
 	call GetNoisePolynom
-	ld hl, whUGEch4.polynom
+	ld hl, wCH4.polynom
 	ld [hld], a
-	assert whUGEch4.polynom - 1 == whUGEch4.lfsrWidth
+	assert wCH4.polynom - 1 == wCH4.lfsrWidth
 	or [hl] ; The polynom's bit 3 is always reset. (TODO: runtime assert this?)
 	ldh [rNR43], a
 	dec hl
-	assert whUGEch4.lfsrWidth - 1 == whUGEch4.ctrlMask
+	assert wCH4.lfsrWidth - 1 == wCH4.ctrlMask
 	ld a, [hl]
 	ldh [rNR44], a
 	ret
@@ -790,7 +790,7 @@ LoadWave:
 .waveInA
 	ld [hUGE_LoadedWaveID], a
 	swap a ; TODO: it would be more useful if this was already multiplied by 16
-	ld hl, whUGE.waves
+	ld hl, wWaves
 	add a, [hl]
 	inc hl
 	ld h, [hl]
@@ -818,7 +818,7 @@ RunTick0Fx:
 	ld a, [de]
 	ld b, a
 	inc de
-	assert whUGEch1.fxParams + 1 == whUGEch1.instrAndFX
+	assert wCH1.fxParams + 1 == wCH1.instrAndFX
 	ld a, [de]
 	and $0F ; Strip instrument bits.
 	add a, a ; Each entry in the table is 2 bytes.
@@ -827,7 +827,7 @@ RunTick0Fx:
 	adc a, HIGH(Tick0Fx)
 	sub l
 	ld h, a
-	assert whUGEch1.instrAndFX + 1 == whUGEch1.note
+	assert wCH1.instrAndFX + 1 == wCH1.note
 	inc de
 	; WARNING: `NoteCutTick0Trampoline` assumes that it's jumped to with `a == h`.
 	jp hl
@@ -855,7 +855,7 @@ FxTonePortaSetup:
 	ld a, [hli]
 	ld b, [hl]
 	; Write it.
-	ld hl, whUGEch1.portaTarget - whUGEch1.note
+	ld hl, wCH1.portaTarget - wCH1.note
 	add hl, de
 	ld [hli], a
 	ld [hl], b
@@ -865,7 +865,7 @@ KnownRet:
 
 ; Must not alter its params so that it can be used in `SubpatternFxVibrato` (or that one must `push`).
 FxResetVibCounter:
-	ld hl, whUGEch1.vibratoCounter - whUGEch1.note
+	ld hl, wCH1.vibratoCounter - wCH1.note
 	add hl, de
 	ld [hl], b ; Write the counter and the offset (will be applied when the counter underflows).
 	ret
@@ -924,7 +924,7 @@ FxSetPanning:
 
 FxPatternBreak:
 	ld a, b
-	ld [whUGE.forceRow], a
+	ld [wForceRow], a
 	ret
 
 
@@ -973,7 +973,7 @@ FxVolumeSlide:
 	; CH4 doesn't have a period, so this'll read garbage;
 	; however, this is OK, because the lower 3 bits are ignored by the hardware register anyway.
 	; We only need to mask off the upper bits which might be set.
-	ld hl, whUGEch1.period + 1 - whUGEch1.note
+	ld hl, wCH1.period + 1 - wCH1.note
 	add hl, de ; Go to the period's high byte
 	ldh a, [c]
 	xor [hl]
@@ -1003,20 +1003,20 @@ Tick0Fx:
 	jr NoteCutTick0Trampoline
 FxSetSpeed:
 	ld a, b
-	ld [whUGE.ticksPerRow], a
+	ld [wTicksPerRow], a
 	ret
 
 
 FxPosJump:
 	; Writing to `orderIdx` directly is safe, because it is only read by `ReadRow`,
 	; all calls to which happen before any FX processing. (The rows are cached in RAM.)
-	ld hl, whUGE.orderIdx
+	ld hl, wOrderIdx
 	ld a, b
 	ld [hli], a
 	; Set the necessary bits to make this non-zero;
 	; if a row is already being forced, this keeps it, but will select row 0 otherwise.
 	inc hl
-	assert whUGE.orderIdx + 2 == whUGE.forceRow
+	assert wOrderIdx + 2 == wForceRow
 	assert LOW(-PATTERN_LENGTH) == $C0 ; Set the corresponding bits.
 	set 7, [hl]
 	set 6, [hl]
@@ -1095,7 +1095,7 @@ FxArpeggio:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Pick an offset from the base note.
-	ld a, [whUGE.arpState]
+	ld a, [wArpState]
 	rra ; Carry is clear from the `add`, so this is really `srl a`.
 	jr z, .noOffset ; arpState == 1
 	ld a, b ; Read FX params.
@@ -1105,7 +1105,7 @@ FxArpeggio:
 	and $0F ; Only keep the selected offset.
 .noOffset
 	; Add the offset (b & $0F) to the base period, and write it to NRx3/NRx4.
-	ld hl, whUGEch1.period - whUGEch1.note
+	ld hl, wCH1.period - wCH1.note
 	add hl, de
 	add a, [hl]
 	ldh [c], a
@@ -1121,9 +1121,9 @@ FxArpeggio:
 FxCallRoutine:
 	; Compute pointer to the routine.
 	ld a, b
-	add a, LOW(whUGE.routines)
+	add a, LOW(wRoutines)
 	ld l, a
-	adc a, HIGH(whUGE.routines)
+	adc a, HIGH(wRoutines)
 	sub l
 	ld h, a
 	; Deref the pointer, and call it.
@@ -1163,10 +1163,10 @@ FxPortaUp:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Cache control mask for writing to NRx4.
-	ld hl, whUGEch1.ctrlMask - whUGEch1.note
+	ld hl, wCH1.ctrlMask - wCH1.note
 	add hl, de
 	ld a, [hli]
-	assert whUGEch1.ctrlMask + 1 == whUGEch1.period
+	assert wCH1.ctrlMask + 1 == wCH1.period
 	res 7, a ; Remove trigger bit.
 	ld e, a
 	; Add param to period, writing it back & to NRx3/4.
@@ -1197,10 +1197,10 @@ FxPortaDown:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Cache control mask for writing to NRx4.
-	ld hl, whUGEch1.ctrlMask - whUGEch1.note
+	ld hl, wCH1.ctrlMask - wCH1.note
 	add hl, de
 	ld a, [hli]
-	assert whUGEch1.ctrlMask + 1 == whUGEch1.period
+	assert wCH1.ctrlMask + 1 == wCH1.period
 	res 7, a ; Remove trigger bit.
 	ld e, a
 	; Add param to period, writing it back & to NRx3/4.
@@ -1257,7 +1257,7 @@ FxVibrato:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Tick the vibrato.
-	ld hl, whUGEch1.vibratoCounter - whUGEch1.note
+	ld hl, wCH1.vibratoCounter - wCH1.note
 	add hl, de
 	ld a, [hl]
 	sub $10 ; Decrement the counter in the upper 4 bits. TODO: it would be nicer to increment instead, then the upper nibble is already 0.
@@ -1267,13 +1267,13 @@ FxVibrato:
 	ld [hld], a
 	dec hl
 	dec hl
-	assert whUGEch1.vibratoCounter - 3 == whUGEch1.period + 1
+	assert wCH1.vibratoCounter - 3 == wCH1.period + 1
 	xor b ; Get back the previous value (the offset to be applied).
 	ld e, a
 	ld d, [hl] ; Read HIGH(period).
 	dec hl
 	ld a, [hld] ; Read LOW(period).
-	assert whUGEch1.period - 1 == whUGEch1.ctrlMask
+	assert wCH1.period - 1 == wCH1.ctrlMask
 	add a, e
 	ldh [c], a
 	inc c
@@ -1304,13 +1304,13 @@ FxTonePorta:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Load the target period.
-	ld hl, whUGEch1.portaTarget + 1 - whUGEch1.note
+	ld hl, wCH1.portaTarget + 1 - wCH1.note
 	add hl, de
 	ld a, [hld]
 	ld d, a
 	ld a, [hld]
 	ld e, a
-	assert whUGEch1.period == whUGEch1.portaTarget - 2
+	assert wCH1.period == wCH1.portaTarget - 2
 	; TODO: I don't like that `push`, can we do better?
 	dec hl
 	push hl ; Save the pointer to LOW(period).
@@ -1335,9 +1335,9 @@ FxTonePorta:
 
 FxNoteDelay:
 	; Should the note start now?
-	ld a, [whUGE.rowTimer]
+	ld a, [wRowTimer]
 	ld e, a ; How many ticks are remaining.
-	ld a, [whUGE.ticksPerRow]
+	ld a, [wTicksPerRow]
 	sub e ; How many ticks have elapsed.
 	cp b
 	ret nz ; Wait until the time is right.
@@ -1353,7 +1353,7 @@ FxNoteDelay:
 	; The duty function expects a few more params.
 	ld l, e ; The high byte of the note pointer was already transferred above.
 	dec hl
-	assert whUGEch1.note - 1 == whUGEch1.instrAndFX
+	assert wCH1.note - 1 == wCH1.instrAndFX
 	ld e, c ; Transfer the bit mask, since we already have it.
 	; We must now compute LOW(rNRx4): $10 for CH1, $15 for CH2.
 	srl c ; 00 / 01
@@ -1366,15 +1366,15 @@ FxNoteDelay:
 
 FxNoteCut:
 	; Should the note be cut now?
-	ld a, [whUGE.rowTimer]
+	ld a, [wRowTimer]
 	ld h, a ; How many ticks are remaining.
-	ld a, [whUGE.ticksPerRow]
+	ld a, [wTicksPerRow]
 .computeTick ; WARNING: see comments in `NoteCutTick0Trampoline` about register usage.
 	sub h ; How many ticks have elapsed.
 	cp b
 	ret nz ; Wait until the time is right.
 	; Make sure to disable the subpattern as well.
-	ld hl, whUGEch1.subPattern - whUGEch1.note
+	ld hl, wCH1.subPattern - wCH1.note
 	add hl, de
 	xor a ; Set the pointer to NULL.
 	ld [hli], a
@@ -1445,7 +1445,7 @@ FxTonePorta2:
 	ld a, d
 	ld [hld], a
 	dec hl
-	assert whUGEch1.period - 1 == whUGEch1.ctrlMask
+	assert wCH1.period - 1 == wCH1.ctrlMask
 	or [hl]
 	res 7, a ; We don't want to trigger the channel.
 	ldh [c], a
@@ -1487,31 +1487,31 @@ GetNoisePolynom:
 
 ContinueFx: ; TODO: if this is short enough, swapping it with the other path may allow for a `jr`.
 	; Run "continuous" FX.
-	ld hl, whUGEch1.fxParams
+	ld hl, wCH1.fxParams
 	ld c, hUGE_CH1_MASK
 	call .runFx
-	ld hl, whUGEch1.ctrlMask
+	ld hl, wCH1.ctrlMask
 	ld c, hUGE_CH1_MASK
 	call TickSubpattern
 
-	ld hl, whUGEch2.fxParams
+	ld hl, wCH2.fxParams
 	ld c, hUGE_CH2_MASK
 	call .runFx
-	ld hl, whUGEch2.ctrlMask
+	ld hl, wCH2.ctrlMask
 	ld c, hUGE_CH2_MASK
 	call TickSubpattern
 
-	ld hl, whUGEch3.fxParams
+	ld hl, wCH3.fxParams
 	ld c, hUGE_CH3_MASK
 	call .runFx
-	ld hl, whUGEch3.ctrlMask
+	ld hl, wCH3.ctrlMask
 	ld c, hUGE_CH3_MASK
 	call TickSubpattern
 
-	ld hl, whUGEch4.fxParams
+	ld hl, wCH4.fxParams
 	ld c, hUGE_CH4_MASK
 	call .runFx
-	ld hl, whUGEch4.ctrlMask
+	ld hl, wCH4.ctrlMask
 	ld c, hUGE_CH4_MASK
 IF !DEF(PREVIEW_MODE)
 	jp TickSubpattern
@@ -1529,7 +1529,7 @@ ENDC
 	ld a, [hli]
 	ld b, a
 	ld a, [hli]
-	assert whUGEch1.instrAndFX + 1 == whUGEch1.note
+	assert wCH1.instrAndFX + 1 == wCH1.note
 	ld e, l
 	ld d, h
 	and $0F ; Strip instrument bits.
@@ -1556,33 +1556,31 @@ hUGE_LoadedWaveID:: db ; ID of the wave the driver currently has loaded in RAM.
 	DEF hUGE_NO_WAVE equ 100
 	EXPORT hUGE_NO_WAVE
 
-whUGE: ; TODO: this label is actually a bit pointless.
-
-.arpState: db ; 1 = No offset, 2 = Use Y, 3 = Use X. Global coounter for continuity across rows.
-.rowTimer: db ; How many ticks until switching to the next row.
+wArpState: db ; 1 = No offset, 2 = Use Y, 3 = Use X. Global coounter for continuity across rows.
+wRowTimer: db ; How many ticks until switching to the next row.
 
 ; Active song "cache".
 
-.ticksPerRow: db ; How many ticks between each row.
-.lastPatternIdx: db ; Index of the last pattern in the orders.
+wTicksPerRow: db ; How many ticks between each row.
+wLastPatternIdx: db ; Index of the last pattern in the orders.
 
-.dutyInstrs: dw
-.waveInstrs: dw
-.noiseInstrs: dw
+wDutyInstrs: dw
+wWaveInstrs: dw
+wNoiseInstrs: dw
 
-.routines: dw
+wRoutines: dw
 
-.waves: dw
+wWaves: dw
 
 ; Global variables.
 
 IF DEF(PREVIEW_MODE)
-.loopPatterns: db ; If non-zero, instead of falling through to the next pattern, loop the current one.
+wLoopPatterns: db ; If non-zero, instead of falling through to the next pattern, loop the current one.
 ENDC
 
-.orderIdx: db ; Index into the orders, *in bytes*.
-.patternIdx: db ; Index into the current patterns, with the two high bits set.
-.forceRow: db ; If non-zero, will be written (verbatim) to `patternIdx` on the next tick 0, bypassing the increment.
+wOrderIdx: db ; Index into the orders, *in bytes*.
+wPatternIdx: db ; Index into the current patterns, with the two high bits set.
+wForceRow: db ; If non-zero, will be written (verbatim) to `patternIdx` on the next tick 0, bypassing the increment.
 
 ; Individual channels.
 MACRO channel
@@ -1615,10 +1613,10 @@ MACRO channel
 	ENDC
 ENDM
 
-whUGEch1:  channel 1
-whUGEch2:  channel 2
-whUGEch3:  channel 3
-whUGEch4:  channel 4
+wCH1:  channel 1
+wCH2:  channel 2
+wCH3:  channel 3
+wCH4:  channel 4
 
 
 SECTION "hUGE music driver HRAM", HRAM
