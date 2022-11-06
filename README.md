@@ -21,7 +21,7 @@ I am for that to be the case, anyway; please feel free to report any incompatibi
    This is required because `fortISSimO.asm` lacks a [`SECTION` directive](https://rgbds.gbdev.io/docs/v0.6.0/rgbasm.5/#SECTIONS), so that you can put it in whatever section you desire.
 2. Export your songs from hUGETracker using the "Export to RGBDS .asm..." option.
 3. Both `fortISSimO.asm` and all files exported by hUGETracker contain `INCLUDE "include/hUGE.inc"` (referring to [this file](https://github.com/ISSOtm/fortISSimO/blob/master/include/hUGE.inc)).
-   You may need to pass [a `-i` flag](https://rgbds.gbdev.io/docs/v0.6.0/rgbasm.1#i) to RGBASM for it to work (e.g. [`-i src/fortISSimO`](https://github.com/ISSOtm/fortISSimO-demo/blob/d10a2107ac46cef3933f6ec21d9cfef91b232743/Makefile#L29)).
+   You may need to pass [a `-I` flag](https://rgbds.gbdev.io/docs/v0.6.0/rgbasm.1#I) to RGBASM for it to work (e.g. [`-I src/fortISSimO`](https://github.com/ISSOtm/fortISSimO-demo/blob/d10a2107ac46cef3933f6ec21d9cfef91b232743/Makefile#L29)).
 4. At least once before the first call to `hUGE_TickSound` (so, for example, [during boot-up](https://github.com/ISSOtm/fortISSimO-demo/blob/d10a2107ac46cef3933f6ec21d9cfef91b232743/src/main.asm#L70-L74)), you must set `hUGE_MutedChannels` (usually to 0 to enable all channels).
 
 ### GBDK
