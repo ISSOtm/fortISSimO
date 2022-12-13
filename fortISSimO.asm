@@ -15,10 +15,6 @@ INCLUDE "include/hUGE.inc" ; Get the note constants.
 ; from the driver to signal key updates.
 ; This goes both ways, though: don't try to run PREVIEW_MODE code outside of hUGETracker!
 
-DEF PATTERN_LENGTH equ 64 ; How many rows in a pattern.
-DEF ROW_SIZE equ 3 ; How many bytes per row.
-DEF ORDER_WIDTH equ 2 ; How many bytes in each order entry.
-
 MACRO No ; For "empty" entries in the JR tables.
 	ret
 	ds 1
