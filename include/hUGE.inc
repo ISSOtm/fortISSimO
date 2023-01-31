@@ -26,6 +26,7 @@ MACRO dn
     ELIF FX == FX_MASTER_VOL
     ELIF FX == FX_ROUTINE
     ELIF FX == FX_NOTE_DELAY
+        assert NOTE < LAST_NOTE, "Cannot use note delay without a note!"
     ELIF FX == FX_PANNING
     ELIF FX == FX_DUTY_CYCLE
     ELIF FX == FX_VOL_SLIDE
