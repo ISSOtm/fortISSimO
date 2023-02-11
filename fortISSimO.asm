@@ -519,6 +519,12 @@ ReadRow:
 	cp FX_TONE_PORTA
 	ret
 
+; Starts playing a new note on the channel, writing back its period to the channel's struct.
+; @param a:  ID of the note to play.
+; @param c:  LOW(rNRx3)
+; @param hl: Pointer to the channel's `.period`.
+; @destroy c de hl a
+def PlayNewNote equs "PlayDutyNote.playNewNote"
 
 ; @param c:  LOW(rNRx0)
 ; @param e:  The channel's bit mask in the muted/allowed channel bytes.
@@ -591,6 +597,9 @@ PlayDutyNote:
 
 	; Next, apply the note.
 	pop af ; Retrieve the note ID (from d to a).
+	;; NOTE: aliased as `PlayNewNote`; if modifying this, please check the documentation accordingly.
+	; (An alias is used to keep `.noInstr` below as a local label.)
+.playNewNote
 	; Compute a pointer to the note's period.
 	add a, a
 	add a, LOW(PeriodTable)
@@ -1104,26 +1113,23 @@ FxArpeggio:
 	ld c, a
 	; Pick an offset from the base note.
 	ld a, [wArpState]
-	rra ; Carry is clear from the `add`, so this is really `srl a`.
+	dec a
 	jr z, .noOffset ; arpState == 1
+	dec a
 	ld a, b ; Read FX params.
-	jr nc, .useY ; arpState == 2
+	jr z, .useY ; arpState == 2
 	swap a
 .useY
 	and $0F ; Only keep the selected offset.
 .noOffset
-	; Add the offset (b & $0F) to the base period, and write it to NRx3/NRx4.
+	; Add the offset (b & $0F) to the base note.
+	ld l, a
+	ld a, [de]
+	add a, l
+	; Play this note.
 	ld hl, wCH1.period - wCH1.note
 	add hl, de
-	add a, [hl]
-	ldh [c], a
-	inc hl
-	inc c
-	ld a, 0
-	adc a, [hl]
-	; TODO: whoops, where did the ctrl mask go? But there's not enough room...
-	ldh [c], a
-	ret
+	jp PlayNewNote
 
 
 FxCallRoutine:
