@@ -531,10 +531,6 @@ PlayDutyNote:
 	ld a, [hUGE_MutedChannels]
 	and e
 	ret nz
-	; If the channel is not inhibited, allow it to be used by FX as well.
-	ldh a, [hUGE_AllowedChannels]
-	or e
-	ldh [hUGE_AllowedChannels], a
 
 	; Let's roll!
 	push de ; Save the note index for later.
@@ -550,12 +546,18 @@ PlayDutyNote:
 	; TODO: assert that this is the case!
 	rra ; *8 now.
 	rra ; *4 now.
-	ld e, a
+	ld d, a
 	rra ; *2 now.
-	add a, e ; *2 + *4 = *6, perfect!
-	ld e, a
+	add a, d ; *2 + *4 = *6, perfect!
+	ld d, a
+	; If the channel is not inhibited, allow it to be used by FX as well.
+	; We can't do this earlier because of register pressure.
+	ldh a, [hUGE_AllowedChannels]
+	or e
+	ldh [hUGE_AllowedChannels], a
+	; Resume computing the instrument pointer.
 	ld a, [wDutyInstrs]
-	add a, e
+	add a, d
 	ld e, a
 	ld a, [wDutyInstrs + 1]
 	adc a, 0
@@ -630,10 +632,6 @@ PlayWaveNote:
 	ld a, [hUGE_MutedChannels]
 	and hUGE_CH3_MASK
 	ret nz
-	; If the channel is not inhibited, allow it to be used by FX as well.
-	ldh a, [hUGE_AllowedChannels]
-	or hUGE_CH3_MASK
-	ldh [hUGE_AllowedChannels], a
 
 	; First, apply the instrument.
 	ld a, [wCH3.instrAndFX]
@@ -658,6 +656,10 @@ PlayWaveNote:
 	sub e
 	ld h, a
 	ld l, e
+	; If the channel is not inhibited, allow it to be used by FX as well.
+	ldh a, [hUGE_AllowedChannels]
+	or hUGE_CH3_MASK
+	ldh [hUGE_AllowedChannels], a
 	; Perform the instrument's writes.
 	ld a, [hli] ; Length.
 	ldh [rNR31], a
@@ -716,10 +718,6 @@ PlayNoiseNote:
 	ld a, [hUGE_MutedChannels]
 	and hUGE_CH4_MASK
 	ret nz
-	; If the channel is not inhibited, allow it to be used by FX as well.
-	ldh a, [hUGE_AllowedChannels]
-	or hUGE_CH4_MASK
-	ldh [hUGE_AllowedChannels], a
 
 	; First, apply the instrument.
 	ld a, [wCH4.instrAndFX]
@@ -745,6 +743,10 @@ PlayNoiseNote:
 	sub e
 	ld h, a
 	ld l, e
+	; If the channel is not inhibited, allow it to be used by FX as well.
+	ldh a, [hUGE_AllowedChannels]
+	or hUGE_CH4_MASK
+	ldh [hUGE_AllowedChannels], a
 	; Perform the instrument's writes.
 	ld a, [hli] ; Volume & envelope.
 	ldh [rNR42], a
