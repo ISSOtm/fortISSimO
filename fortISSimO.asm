@@ -123,12 +123,12 @@ ELSE
 	assert wWaves + 2 == wOrderIdx
 ENDC
 
-	; Orders begin at 0
-	xor a
 IF DEF(PREVIEW_MODE)
 	inc hl ; The tracker writes the starting order instead.
 	assert wOrderIdx == current_order
 ELSE
+	; Orders begin at 0.
+	xor a
 	ld [hli], a
 ENDC
 	assert wOrderIdx + 1 == wPatternIdx
