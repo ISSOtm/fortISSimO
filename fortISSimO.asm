@@ -56,7 +56,7 @@ hUGE_StartSong::
 
 	assert wArpState + 1 == wRowTimer
 	; a = 1
-	ld [hli], a ; The next playback will be tick 0.
+	ld [hli], a ; The next tick will switch to a new row.
 
 	assert wRowTimer + 1 == wTicksPerRow
 	ld a, [de]
@@ -466,7 +466,7 @@ TickSubpattern:
 	dw FxSetVolume
 	dw KnownRet ; No pattern break
 	dw KnownRet ; No note cut
-	dw FxSetSpeed
+	dw KnownRet ; This would reset the row timer, and you DEFINITELY don't want that.
 
 
 ; @param hl: Pointer to the channel's order pointer.
@@ -1008,6 +1008,9 @@ Tick0Fx:
 FxSetSpeed:
 	ld a, b
 	ld [wTicksPerRow], a
+	; We want the new tempo to take effect immediately; so, we must reload the timer as well.
+	; This is easy to do, since we are on tick 0.
+	ld [wRowTimer], a
 	ret
 
 
@@ -1606,7 +1609,7 @@ MACRO channel
 		.lfsrWidth: db
 		; The current "polynom" (what gets written to NR43).
 		.polynom: db
-		ds 3 ; Ensures that both branches are the same size
+		ds 3 ; Ensures that both branches are the same size.
 	ENDC
 ENDM
 
