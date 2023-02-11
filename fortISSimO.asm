@@ -252,7 +252,6 @@ ENDC
 	db $FE ; cp <ld [hl], a>
 .forceRow
 	ld [hl], a
-	REFRESH_ROW ; TODO: tracker is not gonna like the new format
 .samePattern
 	; Compute the offset into the pattern.
 	ld a, [hli]
