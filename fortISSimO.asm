@@ -1279,9 +1279,7 @@ FxVibrato:
 	and $0F ; Only keep the low 4 bits (the offset to be applied).
 	xor b ; Reload the counter, and toggle the offset.
 	ld [hld], a
-	dec hl
-	dec hl
-	assert wCH1.vibratoCounter - 3 == wCH1.period + 1
+	assert wCH1.vibratoCounter - 1 == wCH1.period + 1
 	xor b ; Get back the previous value (the offset to be applied).
 	ld e, a
 	ld d, [hl] ; Read HIGH(period).
@@ -1607,16 +1605,19 @@ MACRO channel
 		; The current "period" (what gets written to NRx3/NRx4).
 		; This must be cached for effects like toneporta, which decouple this from the note.
 		.period: dw
-		; The "period" that tone porta slides towards.
-		; (Redundant with the "note", but makes the "continuous" FX code faster.)
-		.portaTarget: dw
-		.vibratoCounter: db ; Upper 4 bits count down, lower 4 bits contain the next offset from the base note.
+		UNION
+			; The "period" that tone porta slides towards.
+			; (Redundant with the "note", but makes the "continuous" FX code faster.)
+			.portaTarget: dw
+		NEXTU
+			.vibratoCounter: db ; Upper 4 bits count down, lower 4 bits contain the next offset from the base note.
+		ENDU
 	ELSE ; CH4 is a lil' different.
 		; The LFSR width bit (as in NR43).
 		.lfsrWidth: db
 		; The current "polynom" (what gets written to NR43).
 		.polynom: db
-		ds 3 ; Ensures that both branches are the same size.
+		ds 2 ; Ensures that both branches are the same size.
 	ENDC
 ENDM
 
