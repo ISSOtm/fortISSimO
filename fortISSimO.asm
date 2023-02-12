@@ -459,7 +459,7 @@ TickSubpattern:
 	dw FxCallRoutine
 	dw KnownRet ; No note delay
 	dw FxSetPanning
-	dw FxSetDutyCycle
+	dw FxChangeTimbre
 	dw FxVolumeSlide
 	dw KnownRet ; No pos jump
 	dw FxSetVolume
@@ -855,6 +855,29 @@ RunTick0Fx:
 
 ; First, FX code that only runs on tick 0.
 
+FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
+.ch1
+	ld a, b
+	ldh [rNR11], a
+	ret
+.ch2
+	ld a, b
+	ldh [rNR21], a
+	ret
+.ch3
+	ld a, b
+	call LoadWave.waveInA
+	; We now need to retrigger the channel, since we needed to stop it to reload the wave.
+	ld hl, wCH3.period + 1
+	ld a, [hld] ; It's annoying that these bits are there, but that's how it is.
+	dec hl
+	assert wCH3.period + 1 - 2 == wCH3.ctrlMask
+	or [hl]
+	or $80
+	ldh [rNR34], a
+	ret
+
+
 FxTonePortaSetup:
 	; TODO: runtime assert that CH4 is not the target.
 	; Setup portion: get the target period.
@@ -885,24 +908,23 @@ FxResetVibCounter:
 	ret
 
 
-; This one is slightly out of order so it can `jr LoadWave.waveInA`.
+; This one is slightly out of order so it can `jr FxChangeTimbre2.chX`.
 
 ; For CH1 and CH2, this is written as-is to NRx1;
 ; for CH3, this is the ID of the wave to load;
 ; for CH4, this is the new LFSR width bit to write to NR43.
-FxSetDutyCycle:
+FxChangeTimbre:
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
 	; Dispatch.
 	rra
-	jr c, .ch1
+	jr c, FxChangeTimbre2.ch1
 	rra
-	jr c, .ch2
+	jr c, FxChangeTimbre2.ch2
 	rra
-	ld a, b ; Read the FX's params.
-	jr c, LoadWave.waveInA
+	jr c, FxChangeTimbre2.ch3
 .ch4
 	; Keep the polynom bits, but replace the LFSR width bit.
 	ldh a, [rNR43]
@@ -910,14 +932,6 @@ FxSetDutyCycle:
 	; TODO: runtime assert that this is $00 or AUD4POLY_STEP
 	or b
 	ldh [rNR43], a
-	ret
-.ch1
-	ld a, b
-	ldh [rNR11], a
-	ret
-.ch2
-	ld a, b
-	ldh [rNR21], a
 	ret
 
 
@@ -933,7 +947,7 @@ FxSetPanning:
 	ret
 
 
-; FxSetDutyCycle is a bit above.
+; FxChangeTimbre is a bit above.
 
 
 FxPatternBreak:
@@ -1009,7 +1023,7 @@ Tick0Fx:
 	jr FxCallRoutine
 	No note delay
 	jr FxSetPanning
-	jr FxSetDutyCycle
+	jr FxChangeTimbre
 	jr FxVolumeSlide
 	jr FxPosJump
 	jr FxSetVolume
