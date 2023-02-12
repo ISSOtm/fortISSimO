@@ -455,7 +455,7 @@ TickSubpattern:
 	dw FxPortaUp
 	dw FxPortaDown
 	dw KnownRet ; No tone porta
-	dw SubpatternFxVibrato
+	dw KnownRet ; No vibrato
 	dw FxSetMasterVolume
 	dw FxCallRoutine
 	dw KnownRet ; No note delay
@@ -1269,9 +1269,6 @@ ContinuousFx:
 ; Tone porta is a bit below, so that it's closer to `FxTonePorta2`.
 
 
-SubpatternFxVibrato:
-	call FxResetVibCounter
-	; fallthrough
 FxVibrato:
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
