@@ -171,14 +171,15 @@ ENDC
 	assert wCH1.subPatternRow + 1 == wCH1.ctrlMask
 	; Same as above.
 	ld [hli], a
-	; Then, we have the the 5 channel-dependent bytes
-	; (period + porta target + vib counter / LFSR width + polynom + padding); they don't need init.
+	; Then, we have the 4 channel-dependent bytes
+	; (period + (porta target / vib counter) / LFSR width + polynom + padding); they don't need init.
 	ld a, l
-	add a, 5
+	add a, 4
 	ld l, a
 	adc a, h
 	sub l
 	ld h, a
+	assert wCH1.ctrlMask + 5 == wCH2
 
 	dec c ; Are we done?
 	jr nz, .initChannel
