@@ -3,11 +3,20 @@
 [![CC0 licensed (public domain)](https://licensebuttons.net/p/zero/1.0/80x15.png)](http://creativecommons.org/publicdomain/zero/1.0/)
 
 A speed- and size-focused Game Boy music driver.
+A table [comparing pros and cons of many GB music drivers](https://github.com/ISSOtm/fortISSimO/wiki/Drivers-comparison) is available on the wiki.
 
 For documentation and example of usage, see [fortISSimO-demo](https://github.com/ISSOtm/fortISSimO-demo).
 
+
+## Comparison with hUGEDriver
+
 This driver can be used as a drop-in replacement of [SuperDisk's GB sound driver][hUGEDriver].
-A table [comparing pros and cons of many GB music drivers](https://github.com/ISSOtm/fortISSimO/wiki/Drivers-comparison) is available on the wiki.
+It has, however, a few differences:
+
+- This driver should perform a bit faster than hUGEDriver, and be somewhat smaller.
+- Vibrato is **not** supported at all in subpatterns!
+  Please use `1xx` and `2xx` instead.
+- Since the driver's internals are different, routines are **not** compatible between hUGEDriver and fortISSimO.
 
 ## Quick start
 
@@ -29,7 +38,7 @@ I am for that to be the case, anyway; please feel free to report any incompatibi
 0. **Required**: RGBDS 0.5.0 or later, `rgb2sdas` from hUGEDriver (a pre-built Windows binary lies [in `gbdk_example/`](https://github.com/SuperDisk/hUGEDriver/tree/master/gbdk_example), and its source code in [`tools/`](https://github.com/SuperDisk/hUGEDriver/tree/master/tools)).
 1. Build `fortISSimO.asm`:
    ```bash
-   rgbasm fortISSimO.asm -o fortISSimO.obj -DGBDK
+   rgbasm fortISSimO.asm -o fortISSimO.obj
    ```
 2. Convert it to a SDCC object file:
    ```bash
