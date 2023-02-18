@@ -205,16 +205,19 @@ ENDC
 	inc hl
 	; All of these don't need to be init'd.
 	assert wCH1.order + 2 == wCH1.fxParams
-	assert wCH1.fxParams + 1 == wCH1.instrAndFX
-	assert wCH1.instrAndFX + 1 == wCH1.note
-	assert wCH1.note + 1 == wCH1.subPattern
 	inc hl ; Skip FX params.
-	inc hl ; Skip instrument/FX byte.
+	assert wCH1.fxParams + 1 == wCH1.instrAndFX
+	; The FX is checked on the first tick for whether it is a vibrato; set it to 0, which is not that.
+	assert FX_VIBRATO != 0
+	xor a
+	ld [hli], a
+	assert wCH1.instrAndFX + 1 == wCH1.note
 	inc hl ; Skip note ID.
+	assert wCH1.note + 1 == wCH1.subPattern
 
 	; To ensure that nothing bad happens if a note isn't played on the first row, set the subpattern
 	; pointer to NULL.
-	xor a
+	; xor a ; a is already 0.
 	ld [hli], a
 	ld [hli], a
 	assert wCH1.subPattern + 2 == wCH1.subPatternRow
@@ -227,12 +230,12 @@ ENDC
 	; Then, we have the 4 channel-dependent bytes
 	; (period + (porta target / vib counter) / LFSR width + polynom + padding); they don't need init.
 	ld a, l
-	add a, 4
+	add a, 5
 	ld l, a
 	adc a, h
 	sub l
 	ld h, a
-	assert wCH1.ctrlMask + 5 == wCH2
+	assert wCH1.ctrlMask + 1 + 5 == wCH2
 
 	dec c ; Are we done?
 	jr nz, .initChannel
@@ -330,6 +333,36 @@ ENDC
 	;; Play new rows.
 
 	; Note that all of these functions leave b untouched all the way until CH4's `ReadRow`!
+
+	; If the previous FX was not a vibrato, set the "vibrato arg" to 0.
+	; Note that all of these should run on the song's first tick, which initialises `.vibratoPrevArg`
+	; if the first row has a vibrato, and avoids reading uninit'd RAM.
+	; Note also that these are all run before `RunTick0Fx`, which can write to the overlapping `.portaTarget`,
+	; and before `ReadRow`, which will overwrite `.instrAndFx`.
+	ld a, [wCH1.instrAndFX]
+	and $0F
+	cp FX_VIBRATO
+	jr z, .ch1WasNotVibrato
+	xor a
+	ld [wCH1.vibratoPrevArg], a
+.ch1WasNotVibrato
+
+	ld a, [wCH2.instrAndFX]
+	and $0F
+	cp FX_VIBRATO
+	jr z, .ch2WasNotVibrato
+	xor a
+	ld [wCH2.vibratoPrevArg], a
+.ch2WasNotVibrato
+
+	ld a, [wCH3.instrAndFX]
+	and $0F
+	cp FX_VIBRATO
+	jr z, .ch3WasNotVibrato
+	xor a
+	ld [wCH3.vibratoPrevArg], a
+.ch3WasNotVibrato
+	; CH4 does not support vibrato, so it's not checked.
 
 	assert wForceRow + 1 == wCH1.order
 	; ld hl, wCH1.order
@@ -987,9 +1020,21 @@ KnownRet:
 
 ; Must not alter its params so that it can be used in `SubpatternFxVibrato` (or that one must `push`).
 FxResetVibCounter:
-	ld hl, wCH1.vibratoCounter - wCH1.note
+	ld hl, wCH1.vibratoPrevArg - wCH1.note
 	add hl, de
-	ld [hl], b ; Write the counter and the offset (will be applied when the counter underflows).
+	; If the previous vibrato arg was the same as this one, simply continue it.
+	ld a, b
+	cp [hl]
+	ret z
+	; Write this vibrato's argument, then.
+	ld [hld], a
+	assert wCH1.vibratoPrevArg - 1 == wCH1.vibratoState
+	; On the first tick, we will underflow the counter, and the direction will flip to "positive".
+	xor a
+	ld [hld], a ; Write the counter and the direction bit.
+	assert wCH1.vibratoState - 1 == wCH1.vibratoOffset
+	; Start at no offset.
+	ld [hl], a
 	ret
 
 
@@ -1367,16 +1412,36 @@ FxVibrato:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Tick the vibrato.
-	ld hl, wCH1.vibratoCounter - wCH1.note
+	ld hl, wCH1.vibratoState - wCH1.note
 	add hl, de
 	ld a, [hl]
-	sub $10 ; Decrement the counter in the upper 4 bits. TODO: it would be nicer to increment instead, then the upper nibble is already 0.
+	sub $10 ; Decrement the counter in the upper 4 bits.
 	jr nc, .noUnderflow
-	and $0F ; Only keep the low 4 bits (the offset to be applied).
-	xor b ; Reload the counter, and toggle the offset.
-	ld [hld], a
-	assert wCH1.vibratoCounter - 1 == wCH1.period + 1
-	xor b ; Get back the previous value (the offset to be applied).
+	; Reload counter while toggling the direction bit; optimised thanks to @zlago!
+	rra ; Shift the direction bit into carry.
+	ccf ; Toggle it.
+	ld a, b ; Reload the counter.
+	; Transfer carry into bit 0.
+	rra
+	rlca ; This leaves a copy of bit 0 in carry, so the `rra` is not strictly necessary... were it not for `.noUnderflow`.
+.noUnderflow
+	ld [hld], a ; Write back the new status.
+	assert wCH1.vibratoState - 1 == wCH1.vibratoOffset
+	; Now, let's modify the offset accordingly.
+	rra ; Shift the direction bit into the carry.
+	sbc a, a ; $00 if going up, $FF if going down.
+	cpl ; $FF if going up, $00 if going down.
+	ld e, a
+	; Compute the delta.
+	ld a, b
+	and $0F ; Only keep the lower half of the parameter.
+	; Invert it if going down.
+	xor e
+	sub e ; `sub $FF` is equivalent to `add 1` / `inc a`
+	add a, [hl] ; Add the delta to the offset; this should never over- or underflow.
+	ld [hld], a ; Write back the new offset.
+	; Add the offset to the period.
+	assert wCH1.vibratoOffset - 1 == wCH1.period + 1
 	ld e, a
 	ld d, [hl] ; Read HIGH(period).
 	dec hl
@@ -1390,10 +1455,6 @@ FxVibrato:
 	or [hl] ; Add the control bits.
 	res 7, a ; Don't retrigger the note.
 	ldh [c], a
-	ret
-
-.noUnderflow
-	ld [hl], a
 	ret
 
 
@@ -1697,14 +1758,19 @@ MACRO channel
 			; (Redundant with the "note", but makes the "continuous" FX code faster.)
 			.portaTarget: dw
 		NEXTU
-			.vibratoCounter: db ; Upper 4 bits count down, lower 4 bits contain the next offset from the base note.
+			.vibratoOffset: db ; How much to add to `period` into NRx3/4.
+			.vibratoState: db ; Upper 4 bits count down, lower 4 bits contain the next offset from the base note.
+			; If the previous row contained a vibrato, then this contains its arg; if not, the low 4 bits are zero.
+			; (This is OK because the vibrato wouldn't be reset if and only if its own "slope" was 0,
+			; which makes it have no effect anyway.)
+			.vibratoPrevArg: db
 		ENDU
 	ELSE ; CH4 is a lil' different.
 		; The LFSR width bit (as in NR43).
 		.lfsrWidth: db
 		; The current "polynom" (what gets written to NR43).
 		.polynom: db
-		ds 2 ; Ensures that both branches are the same size.
+		ds 3 ; Ensures that both branches are the same size.
 	ENDC
 ENDM
 
