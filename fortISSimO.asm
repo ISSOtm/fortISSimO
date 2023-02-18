@@ -1395,12 +1395,12 @@ FxNoteCut:
 	ld a, [wTicksPerRow]
 .computeTick ; WARNING: see comments in `NoteCutTick0Trampoline` about register usage.
 	sub h ; How many ticks have elapsed.
-	cp b
+	sub b
 	ret nz ; Wait until the time is right.
 	; Make sure to disable the subpattern as well.
 	ld hl, wCH1.subPattern - wCH1.note
 	add hl, de
-	xor a ; Set the pointer to NULL.
+	; Set the pointer to NULL. (a = 0 here.)
 	ld [hli], a
 	ld [hli], a
 	; Don't touch the channel if not allowed to.
