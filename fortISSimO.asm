@@ -527,9 +527,30 @@ ReadRow:
 ; @destroy c de hl a
 def PlayNewNote equs "PlayDutyNote.playNewNote"
 
+
+; Used by `FxNoteDelay`, hoisted out to save some space in the web of `jr`s that is FX code.
+; @param c:  The channel's bit mask in the muted/allowed channel bytes.
+; @param e:  LOW(Pointer to the channel's note byte)
+; @param d:  The note's ID.
+; @param h:  HIGH(Pointer to the channel's note byte)
+; @destroy c de hl a
+PlaySomeDutyNote:
+	; The duty function expects a few more params.
+	ld l, e ; The high byte of the note pointer was already transferred above.
+	dec hl
+	assert wCH1.note - 1 == wCH1.instrAndFX
+	ld e, c ; Transfer the bit mask, since we already have it.
+	; We must now compute LOW(rNRx4): $10 for CH1, $15 for CH2.
+	srl c ; 00 / 01
+	jr z, :+
+	set 2, c ; 05
+:
+	set 4, c ; 10 / 15
+	; fallthrough
+
 ; @param c:  LOW(rNRx0)
 ; @param e:  The channel's bit mask in the muted/allowed channel bytes.
-; @param d:  The channel's note ID.
+; @param d:  The note's ID.
 ; @param hl: Pointer to the channel's fx/instrument byte.
 ; @destroy c de hl a
 PlayDutyNote:
@@ -1373,19 +1394,8 @@ FxNoteDelay:
 	bit 3, c
 	jp nz, PlayNoiseNote
 	bit 2, c
-	jp nz, PlayWaveNote
-	; The duty function expects a few more params.
-	ld l, e ; The high byte of the note pointer was already transferred above.
-	dec hl
-	assert wCH1.note - 1 == wCH1.instrAndFX
-	ld e, c ; Transfer the bit mask, since we already have it.
-	; We must now compute LOW(rNRx4): $10 for CH1, $15 for CH2.
-	srl c ; 00 / 01
-	jr z, :+
-	set 2, c ; 05
-:
-	set 4, c ; 10 / 15
-	jp PlayDutyNote
+	jp z, PlaySomeDutyNote ; This is more likely to be followed than just CH3.
+	jp nz, PlayWaveNote ; I just want to annoy disassemblers. :3
 
 
 FxNoteCut:
