@@ -1,3 +1,12 @@
+; PREVIEW_MODE is defined when assembling for hUGETracker.
+; hUGETracker contains a Game Boy emulator (the "G" in "UGE"), and it relies on some cooperation
+; from the driver to signal key updates.
+; This goes both ways, though: don't try to run PREVIEW_MODE code outside of hUGETracker!
+
+IF DEF(PREVIEW_MODE)
+	WARN "CAUTION: Using fortISSimO inside hUGETracker itself is experimental.\n\tPlease report any issues to\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<"
+ENDC
+
 INCLUDE "include/hardware.inc" ; Bread & butter: check.
 INCLUDE "include/hUGE.inc" ; Get the note constants.
 
@@ -10,29 +19,12 @@ INCLUDE "include/hUGE.inc" ; Get the note constants.
 ;
 ; "TODO: loose" means that this `hli` could be used as an optimisation point
 
-; PREVIEW_MODE is defined when assembling for hUGETracker.
-; hUGETracker contains a Game Boy emulator (the "G" in "UGE"), and it relies on some cooperation
-; from the driver to signal key updates.
-; This goes both ways, though: don't try to run PREVIEW_MODE code outside of hUGETracker!
-
 MACRO No ; For "empty" entries in the JR tables.
 	ret
 	ds 1
 ENDM
 
-IF DEF(PREVIEW_MODE)
-	DEF TAKE_REG_SNAPSHOT equs "db $f4" ; Signal tracker to take a snapshot of audio regs (for VGM export).
-	DEF REFRESH_ORDER equs "db $fc" ; Signal tracker to re-read the order index.
-	DEF REFRESH_ROW equs "db $fd" ; Signal tracker to re-read the row index.
-
-	WARN "CAUTION: Using fortISSimO inside hUGETracker itself is experimental.\n\tPlease report any issues to\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<"
-ELSE
-	DEF TAKE_REG_SNAPSHOT equs ""
-	DEF REFRESH_ORDER equs ""
-	DEF REFRESH_ROW equs ""
-ENDC
-
-; Defaults.
+; Some defaults.
 IF !DEF(FORTISSIMO_ROM)
 	DEF FORTISSIMO_ROM equs "ROM0"
 ENDC
@@ -260,7 +252,9 @@ ENDC
 	inc a
 .wrapOrders
 	ld [hli], a
-	REFRESH_ORDER
+	IF DEF(PREVIEW_MODE)
+		db $fc ; Signal the tracker to refresh the order index.
+	ENDC
 	assert wOrderIdx + 1 == wPatternIdx
 	db $FE ; cp <ld [hl], a>
 .forceRow
@@ -1720,14 +1714,14 @@ IF DEF(PREVIEW_MODE)
 	.noOrderChange
 
 		call hUGE_TickSound
-		TAKE_REG_SNAPSHOT
+		db $f4 ; Signal tracker to take a snapshot of audio regs (for VGM export).
 
 		; Convert row info to the format the tracker expects.
 		ld a, [wPatternIdx]
 		assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 		and PATTERN_LENGTH - 1
 		ld [row], a
-		REFRESH_ROW
+		db $fd ; Signal tracker to re-read the row index.
 		ret
 
 	SECTION "Preview variables", WRAM0
