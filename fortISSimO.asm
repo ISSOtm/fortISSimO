@@ -50,6 +50,7 @@ IF STRLEN("{FORTISSIMO_ROM}") != 0
 ENDC
 
 _hUGE_StartSong:: ; C interface.
+hUGE_init:: ; Polyfill for hUGETracker's ROM export.
 ; @param de: Pointer to the "song descriptor" to load.
 hUGE_StartSong::
 	ld hl, hUGE_LoadedWaveID
@@ -197,6 +198,7 @@ ENDC
 
 
 _hUGE_TickSound:: ; C interface.
+hUGE_dosound:: ; Polyfill for hUGETracker's ROM export.
 hUGE_TickSound::
 	; Disable all muted channels.
 	ld hl, hUGE_MutedChannels
@@ -1687,6 +1689,8 @@ hUGE_AllowedChannels: db ; Bit mask of which channels the driver is allowed to u
 POPS
 
 IF DEF(PREVIEW_MODE)
+	PURGE hUGE_init, hUGE_dosound
+
 	hUGE_init::
 		ld d, h
 		ld e, l
