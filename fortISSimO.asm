@@ -26,18 +26,28 @@ IF DEF(PREVIEW_MODE)
 	DEF REFRESH_ROW equs "db $fd" ; Signal tracker to re-read the row index.
 
 	WARN "CAUTION: Using fortISSimO inside hUGETracker itself is experimental.\n\tPlease report any issues to\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<"
-
-	SECTION "Sound Driver", ROM0
 ELSE
 	DEF TAKE_REG_SNAPSHOT equs ""
 	DEF REFRESH_ORDER equs ""
 	DEF REFRESH_ROW equs ""
 ENDC
 
+; Defaults.
+IF !DEF(FORTISSIMO_ROM)
+	DEF FORTISSIMO_ROM equs "ROM0"
+ENDC
+IF !DEF(FORTISSIMO_RAM)
+	DEF FORTISSIMO_RAM equs "WRAM0"
+ENDC
+
 ; Note: SDCC's linker is crippled by the lack of alignment support.
 ; So we can't assume any song data nor RAM variables are aligned, as useful as that would be.
 ;
 ; SDCC calling conventions: https://sdcc.sourceforge.net/doc/sdccman.pdf#subsubsection.4.3.5.1
+
+IF STRLEN("{FORTISSIMO_ROM}") != 0
+	SECTION "Sound Driver", FORTISSIMO_ROM
+ENDC
 
 _hUGE_StartSong:: ; C interface.
 ; @param de: Pointer to the "song descriptor" to load.
@@ -1574,7 +1584,7 @@ PeriodTable:
 
 
 PUSHS
-SECTION "hUGE music driver RAM", WRAM0 ; TODO: allow configuring
+SECTION "Music driver RAM", FORTISSIMO_RAM
 
 ; While a channel can be safely tinkered with while muted, if wave RAM is modified,
 ; `hUGE_NO_WAVE` must be written to this variable before unmuting channel 3.
@@ -1649,7 +1659,7 @@ wCH3:  channel 3
 wCH4:  channel 4
 
 
-SECTION "hUGE music driver HRAM", HRAM
+SECTION "Music driver HRAM", HRAM
 
 ; `hUGE_AllowedChannels` is accessed directly a *lot* in FX code, and the 1-byte save from `ldh`
 ; helps keeping all the code in `jr` range.

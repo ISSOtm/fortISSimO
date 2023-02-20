@@ -26,8 +26,8 @@ I am for that to be the case, anyway; please feel free to report any incompatibi
 ### RGBDS
 
 0. **Required**: RGBDS 0.5.0 or later.
-1. [Include](https://rgbds.gbdev.io/docs/v0.6.0/rgbasm.5/#Including_other_source_files) `fortISSimO.asm` from another source file.
-   This is required because `fortISSimO.asm` lacks a [`SECTION` directive](https://rgbds.gbdev.io/docs/v0.6.0/rgbasm.5/#SECTIONS), so that you can put it in whatever section you desire.
+1. [Include](https://rgbds.gbdev.io/docs/v0.6.0/rgbasm.5/#Including_other_source_files) `fortISSimO.asm` in your project.
+   See below about customising the build.
 2. Export your songs from hUGETracker using the "Export to RGBDS .asm..." option.
 3. Both `fortISSimO.asm` and all files exported by hUGETracker contain `INCLUDE "include/hUGE.inc"` (referring to [this file](https://github.com/ISSOtm/fortISSimO/blob/master/include/hUGE.inc)).
    You may need to pass [a `-I` flag](https://rgbds.gbdev.io/docs/v0.6.0/rgbasm.1#I) to RGBASM for it to work (e.g. [`-I src/fortISSimO`](https://github.com/ISSOtm/fortISSimO-demo/blob/d10a2107ac46cef3933f6ec21d9cfef91b232743/Makefile#L29)).
@@ -50,6 +50,16 @@ I am for that to be the case, anyway; please feel free to report any incompatibi
 4. Link `fortISSimO.obj.o` as part of your build.
 
 </details>
+
+## Customising fortISSimO
+
+You can customise the way fortISSimO integrates with your project by defining some symbols when assembling `fortISSimO.asm`.
+(You can do so either by `INCLUDE`ing `fortISSimO.asm` from another file, and/or by using [`-D`](https://rgbds.gbdev.io/docs/v0.6.1/rgbasm.1/#D) options when running `rgbasm`.)
+
+- **`FORTISSIMO_ROM`**: Attributes for fortISSimO's ROM [section](https://rgbds.gbdev.io/docs/v0.6.1/rgbasm.5/#SECTIONS). Examples: `ROM0`, `ROMX, BANK[42]`. Default: `ROM0`.
+  
+  In particular, if this is empty, no `SECTION` directive will be emitted; this is useful when using `INCLUDE "fortISSimO.asm"` inside of a section, and you want fortISSimO to be placed in that same section.
+- **`FORTISSIMO_RAM`**: Attributes for fortISSimO's RAM section. Examples: `WRAM0`, `WRAMX, ALIGN[4]`.
 
 ## Using within hUGETracker
 
