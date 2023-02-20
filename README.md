@@ -35,6 +35,8 @@ I am for that to be the case, anyway; please feel free to report any incompatibi
 
 ### GBDK
 
+<details><summary>rgb2sdas currently does not support all relocation types used by fortISSimO, though the conversion is, strictly speaking, possible. Click to see the instructions nonetheless.</summary>
+
 0. **Required**: RGBDS 0.5.0 or later, `rgb2sdas` from hUGEDriver (a pre-built Windows binary lies [in `gbdk_example/`](https://github.com/SuperDisk/hUGEDriver/tree/master/gbdk_example), and its source code in [`tools/`](https://github.com/SuperDisk/hUGEDriver/tree/master/tools)).
 1. Build `fortISSimO.asm`:
    ```bash
@@ -46,6 +48,8 @@ I am for that to be the case, anyway; please feel free to report any incompatibi
    ```
 3. Use `#include <fortISSimO.h>` (you may need to adapt that path and/or use `-I`) as desired.
 4. Link `fortISSimO.obj.o` as part of your build.
+
+</details>
 
 ## Using within hUGETracker
 
