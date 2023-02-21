@@ -1387,9 +1387,9 @@ FxTonePorta:
 FxNoteDelay:
 	; Should the note start now?
 	ld a, [wRowTimer]
-	ld e, a ; How many ticks are remaining.
+	ld l, a ; How many ticks are remaining.
 	ld a, [wTicksPerRow]
-	sub e ; How many ticks have elapsed.
+	sub l ; How many ticks have elapsed.
 	cp b
 	ret nz ; Wait until the time is right.
 	; All of the "play note" functions expect the note param in d, so let's begin with that.
