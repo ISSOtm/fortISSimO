@@ -15,6 +15,8 @@ It has, however, a few differences:
 - This driver should perform a bit faster than hUGEDriver, and be somewhat smaller.
 - Vibrato is **not** supported at all in subpatterns!
   Please use `1xx` and `2xx` instead.
+- The instrument field is ignored on a row that contain a toneporta effect (`3`).
+  hUGEDriver reloads the instrument instead.
 - Since the driver's internals are different, routines are **not** compatible between hUGEDriver and fortISSimO.
 
 ## Quick start
