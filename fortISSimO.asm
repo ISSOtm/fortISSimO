@@ -25,10 +25,6 @@ ELIF DEF(PREVIEW_MODE)
 	FAIL "fortISSimO is not properly configured for use in hUGETracker!\n\tPlease follow the instructions at the top of hUGEDriver.asm."
 ENDC
 
-INCLUDE "include/hardware.inc" ; Bread & butter: check.
-INCLUDE "include/hUGE.inc" ; Get the note constants.
-
-	rev_Check_hardware_inc 4.2
 
 ; Some terminology notes:
 ; - An "order" is a table of pointers to "patterns".
@@ -37,10 +33,6 @@ INCLUDE "include/hUGE.inc" ; Get the note constants.
 ;
 ; "TODO: loose" means that this `hli` could be used as an optimisation point
 
-MACRO No ; For "empty" entries in the JR tables.
-	ret
-	ds 1
-ENDM
 
 ; Some defaults.
 IF !DEF(FORTISSIMO_ROM)
@@ -49,6 +41,18 @@ ENDC
 IF !DEF(FORTISSIMO_RAM)
 	DEF FORTISSIMO_RAM equs "WRAM0"
 ENDC
+
+
+INCLUDE "include/hardware.inc" ; Bread & butter: check.
+INCLUDE "include/hUGE.inc" ; Get the note constants.
+
+	rev_Check_hardware_inc 4.2
+
+MACRO No ; For "empty" entries in the JR tables.
+	ret
+	ds 1
+ENDM
+
 
 ; Note: SDCC's linker is crippled by the lack of alignment support.
 ; So we can't assume any song data nor RAM variables are aligned, as useful as that would be.
