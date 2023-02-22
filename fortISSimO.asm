@@ -560,13 +560,11 @@ def PlayNewNote equs "PlayDutyNote.playNewNote"
 
 ; Used by `FxNoteDelay`, hoisted out to save some space in the web of `jr`s that is FX code.
 ; @param c:  The channel's bit mask in the muted/allowed channel bytes.
-; @param e:  LOW(Pointer to the channel's note byte)
 ; @param d:  The note's ID.
-; @param h:  HIGH(Pointer to the channel's note byte)
+; @param hl: Pointer to the channel's note byte
 ; @destroy c de hl a
 PlaySomeDutyNote:
 	; The duty function expects a few more params.
-	ld l, e ; The high byte of the note pointer was already transferred above.
 	dec hl
 	assert wCH1.note - 1 == wCH1.instrAndFX
 	ld e, c ; Transfer the bit mask, since we already have it.
@@ -1417,9 +1415,11 @@ FxNoteDelay:
 	cp b
 	ret nz ; Wait until the time is right.
 	; All of the "play note" functions expect the note param in d, so let's begin with that.
-	ld h, d ; The "duty" code path needs to save `de`, though.
-	ld a, [de] ; Read the note byte.
-	ld d, a
+	; `PlaySomeDutyNote` also expects `hl` to point at the note, so `ld d, [hl]` is as efficient as
+	; `ld a, [de] + `ld d, a` plus `ld h, d` to save it.
+	ld h, d
+	ld l, e
+	ld d, [hl] ; Read the note ID.
 	; Dispatch.
 	bit 3, c
 	jp nz, PlayNoiseNote
