@@ -1,10 +1,28 @@
-; PREVIEW_MODE is defined when assembling for hUGETracker.
-; hUGETracker contains a Game Boy emulator (the "G" in "UGE"), and it relies on some cooperation
-; from the driver to signal key updates.
-; This goes both ways, though: don't try to run PREVIEW_MODE code outside of hUGETracker!
+; If you want to use fortISSimO inside of hUGETracker itself, please read the following.
+;
+; fortISSimO is designed to be usable inside of hUGETracker, however:
+;  - This is somewhat experimental, and it's possible to glitch out, hang, and/or crash hUGETracker.
+;  - At this time, a hUGETracker bug prevents the "note cut" effect (`E`) from working on CH3.
+;    This does not affect ROM exports.
+;  - To configure fortISSimO for use in hUGETracker, please uncomment the following line (delete the semicolon),
+;    and make sure to write the hUGETracker version between quotation marks.
+;    For example, you'd get:   DEF HUGETRACKER equs "1.0"
+;
+; DEF HUGETRACKER equs ""
 
-IF DEF(PREVIEW_MODE)
-	WARN "CAUTION: Using fortISSimO inside hUGETracker itself is experimental.\n\tPlease report any issues to\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<"
+IF DEF(HUGETRACKER)
+	WARN "\n\tPlease report this issue to fortISSimO, *NOT* hUGETracker!\n\t(Even if it seems unrelated.)\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<\n\t"
+	IF !STRCMP("{HUGETRACKER}", "1.0b10")
+	ELIF !STRCMP("{HUGETRACKER}", "1.0")
+	ELSE
+		FAIL "Unsupported hUGETracker version \"{HUGETRACKER}\"!"
+	ENDC
+ELIF DEF(PREVIEW_MODE)
+	; PREVIEW_MODE is defined when assembling for hUGETracker.
+	; hUGETracker contains a Game Boy emulator (the "G" in "UGE"), and it relies on some cooperation
+	; from the driver to signal key updates.
+	; This goes both ways, though: don't try to run PREVIEW_MODE code outside of hUGETracker!
+	FAIL "fortISSimO is not properly configured for use in hUGETracker!\n\tPlease follow the instructions at the top of hUGEDriver.asm."
 ENDC
 
 INCLUDE "include/hardware.inc" ; Bread & butter: check.
@@ -41,8 +59,12 @@ IF STRLEN("{FORTISSIMO_ROM}") != 0
 	SECTION "Sound Driver", FORTISSIMO_ROM
 ENDC
 
+IF DEF(HUGETRACKER)
+	hUGE_init:: ; Polyfill for hUGETracker's ROM export.
+		ld d, h
+		ld e, l
+ENDC
 _hUGE_StartSong:: ; C interface.
-hUGE_init:: ; Polyfill for hUGETracker's ROM export.
 ; @param de: Pointer to the "song descriptor" to load.
 hUGE_StartSong::
 	ld hl, hUGE_LoadedWaveID
@@ -189,8 +211,10 @@ ENDC
 	ret
 
 
+IF DEF(HUGETRACKER)
+	hUGE_dosound:: ; Polyfill for hUGETracker's ROM export.
+ENDC
 _hUGE_TickSound:: ; C interface.
-hUGE_dosound:: ; Polyfill for hUGETracker's ROM export.
 hUGE_TickSound::
 	; Disable all muted channels.
 	ld hl, hUGE_MutedChannels

@@ -7,7 +7,6 @@ A table [comparing pros and cons of many GB music drivers](https://github.com/IS
 
 For documentation and example of usage, see [fortISSimO-demo](https://github.com/ISSOtm/fortISSimO-demo).
 
-
 ## Comparison with hUGEDriver
 
 This driver can be used as a drop-in replacement of [SuperDisk's GB sound driver][hUGEDriver].
@@ -69,6 +68,7 @@ To do so:
 0. Optionally (but recommended), back up the files you are about to overwrite.
 1. Find the `hUGEDriver/` directory in your hUGETracker installation.
 2. In that directory, replace `hUGEDriver.asm` by `fortISSimO.asm` (make sure to rename it to `hUGEDriver.asm`), **and also** replace `hUGE.inc` with fortISSimO's—otherwise your song will break!!
+3. Follow the instructions at the top of the new `hUGEDriver.asm`; you should get error messages from hUGETracker if you don't.
 
 Note that this is **experimental** and **not supported by hUGETracker**.
 **Any troubles** encountered while using fortISSimO in hUGETracker should be reported **here**.
