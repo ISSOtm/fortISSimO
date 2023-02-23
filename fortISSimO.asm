@@ -51,17 +51,21 @@ INCLUDE "include/hUGE.inc" ; Get the note constants.
 
 IF DEF(PRINT_DEBUGFILE)
 	PRINTLN "@debugfile 1.0.0"
-	MACRO dbg_action ; <function>, <action:str>
+	MACRO dbg_action ; <function>, <action:str> [, <condition:dbg_expr>]
 		DEF OFS_FROM_BASE equ @ - \1
-		PRINTLN "\1+{d:OFS_FROM_BASE} x: ", \2
-		PURGE OFS_FROM_BASE
+		DEF ACTION_COND equs ""
+		IF _NARG > 2
+			REDEF ACTION_COND equs "\3"
+		ENDC
+		PRINTLN "\1+{d:OFS_FROM_BASE} x {ACTION_COND}: ", \2
+		PURGE OFS_FROM_BASE, ACTION_COND
 	ENDM
 	MACRO runtime_assert ; <function>, <condition:dbg_expr> [, <message:dbg_str>]
 		DEF MSG equs "assert failure"
 		IF _NARG > 2
 			REDEF MSG equs \3
 		ENDC
-		dbg_action \1, "if !(\2); alert \"{MSG}\""
+		dbg_action \1, "alert \"{MSG}\"", !(\2)
 		PURGE MSG
 	ENDM
 	MACRO unreachable ; <function> [, <message:dbg_str>]
