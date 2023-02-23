@@ -292,7 +292,9 @@ hUGE_TickSound::
 	jr nz, .samePattern
 	; Reload index.
 	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
-	ld [hl], -PATTERN_LENGTH ; pow2 is required to be able to mask off these two bits.
+	ld a, -PATTERN_LENGTH ; pow2 is required to be able to mask off these two bits.
+.forceRow
+	ld [hl], a
 IF DEF(PREVIEW_MODE)
 	; If looping is enabled, don't switch patterns.
 	ld a, [loop_order]
@@ -311,13 +313,10 @@ ENDC
 	inc a
 .wrapOrders
 	ld [hli], a
+	assert wOrderIdx + 1 == wPatternIdx
 	IF DEF(PREVIEW_MODE)
 		db $fc ; Signal the tracker to refresh the order index.
 	ENDC
-	assert wOrderIdx + 1 == wPatternIdx
-	db $FE ; cp <ld [hl], a>
-.forceRow
-	ld [hl], a
 .samePattern
 	; Compute the offset into the pattern.
 	ld a, [hli]
@@ -687,6 +686,18 @@ MACRO No ; For "empty" entries in the JR tables.
 	ds 1
 ENDM
 
+DEF NB_TO_PRINT = 0
+MACRO To
+	jr \1
+	IF DEF(PRINT_JR_STATS)
+		DEF TO_PRINT{d:NB_TO_PRINT} equs STRCAT(STRRPL("\2", "from ", ""), ",\1")
+		DEF NB_TO_PRINT += 1
+		DEF FROM equs STRCAT("From", STRRPL("\2", "from ", ""), "To\1")
+		{FROM}::
+		PURGE FROM
+	ENDC
+ENDM
+
 ; First, FX code that only runs on tick 0.
 
 FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
@@ -860,21 +871,21 @@ FxVolumeSlide:
 
 ; The jump table is in the middle of the functions so that backwards `jr`s can be used as well as forwards.
 Tick0Fx:
-	jr FxArpeggio
+	To FxArpeggio, from Tick0Fx
 	No porta up
 	No porta down
-	jr FxTonePortaSetup
-	jr FxResetVibCounter
-	jr FxSetMasterVolume
-	jr FxCallRoutine
+	To FxTonePortaSetup, from Tick0Fx
+	To FxResetVibCounter, from Tick0Fx
+	To FxSetMasterVolume, from Tick0Fx
+	To FxCallRoutine, from Tick0Fx
 	No note delay
-	jr FxSetPanning
-	jr FxChangeTimbre
-	jr FxVolumeSlide
-	jr FxPosJump
-	jr FxSetVolume
-	jr FxPatternBreak
-	jr NoteCutTick0Trampoline
+	To FxSetPanning, from Tick0Fx
+	To FxChangeTimbre, from Tick0Fx
+	To FxVolumeSlide, from Tick0Fx
+	To FxPosJump, from Tick0Fx
+	To FxSetVolume, from Tick0Fx
+	To FxPatternBreak, from Tick0Fx
+	To NoteCutTick0Trampoline, from Tick0Fx
 FxSetSpeed:
 	ld a, b
 	ld [wTicksPerRow], a
@@ -1093,21 +1104,21 @@ FxPortaDown:
 
 ; The jump table is in the middle of the functions so that backwards `jr`s can be used as well as forwards.
 ContinuousFx:
-	jr FxArpeggio
-	jr FxPortaUp
-	jr FxPortaDown
-	jr FxTonePorta
-	jr FxVibrato
+	To FxArpeggio, from ContinuousFx
+	To FxPortaUp, from ContinuousFx
+	To FxPortaDown, from ContinuousFx
+	To FxTonePorta, from ContinuousFx
+	To FxVibrato, from ContinuousFx
 	No set master volume
-	jr FxCallRoutine
-	jr FxNoteDelay
+	To FxCallRoutine, from ContinuousFx
+	To FxNoteDelay, from ContinuousFx
 	No set panning
 	No set duty cycle
 	No volume slide
 	No pos jump
 	No set volume
 	No pattern break
-	jr FxNoteCut
+	To FxNoteCut, from ContinuousFx
 	ret ; No set speed.
 
 
@@ -1827,6 +1838,12 @@ IF DEF(PREVIEW_MODE)
 		assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 		or -PATTERN_LENGTH
 		ld [wForceRow], a
+		; Forcing the row also increases the order index... undo that.
+		ld a, [wOrderIdx]
+		dec a
+		dec a
+		ld [wOrderIdx], a
+		; Acknowledge the request.
 		xor a
 		ld [row_break], a
 	.noBreak
@@ -1858,3 +1875,14 @@ IF DEF(PREVIEW_MODE)
 	row_break: db
 	next_order: db
 ENDC
+
+
+MACRO print_pair
+	PRINTLN STRFMT("%s -> %s = %d", "\1", "\2", \2 - From\1To\2)
+ENDM
+MACRO print_stats
+	FOR I, NB_TO_PRINT
+		print_pair {TO_PRINT{d:I}}
+	ENDR
+ENDM
+	print_stats
