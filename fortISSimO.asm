@@ -48,10 +48,34 @@ INCLUDE "include/hUGE.inc" ; Get the note constants.
 
 	rev_Check_hardware_inc 4.2
 
-MACRO No ; For "empty" entries in the JR tables.
-	ret
-	ds 1
-ENDM
+
+IF DEF(PRINT_DEBUGFILE)
+	PRINTLN "@debugfile 1.0.0"
+	MACRO dbg_action ; <function>, <action:str>
+		DEF OFS_FROM_BASE equ @ - \1
+		PRINTLN "\1+{d:OFS_FROM_BASE} x: ", \2
+		PURGE OFS_FROM_BASE
+	ENDM
+	MACRO runtime_assert ; <function>, <condition:dbg_expr> [, <message:dbg_str>]
+		DEF MSG equs "assert failure"
+		IF _NARG > 2
+			REDEF MSG equs \3
+		ENDC
+		dbg_action \1, "if !(\2); alert \"{MSG}\""
+		PURGE MSG
+	ENDM
+	MACRO unreachable ; <function> [, <message:dbg_str>]
+		DEF MSG equs "unreachable code reached!"
+		IF _NARG > 1
+			REDEF MSG equs \2
+		ENDC
+		dbg_action \1, "alert \"In \1: {MSG}\""
+		PURGE MSG
+	ENDM
+ELSE
+	DEF runtime_assert equs ";"
+	DEF unreachable equs ";"
+ENDC
 
 
 ; Note: SDCC's linker is crippled by the lack of alignment support.
@@ -437,6 +461,7 @@ TickSubpattern:
 	; However, a fifth bit is required to address all 32 rows, and that's the note's 7th bit.
 	ld a, [hli]
 	rlca ; Shift bit 7 into bit 0
+	runtime_assert TickSubpattern, [((([hl] & $0F) * 2) + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
 	ld b, [hl] ; Read the row's FX byte.
 	inc hl
 	xor b
@@ -484,7 +509,7 @@ TickSubpattern:
 	ldh [rNR44], a
 	jr .noNoteOffset
 
-.fxPointers ; TODO: the "known `ret`s" should never be followed, runtime assert that
+.fxPointers
 	dw FxArpeggio
 	dw FxPortaUp
 	dw FxPortaDown
@@ -545,8 +570,8 @@ ReadRow:
 	; If the row is a rest, don't play it.
 	cp ___
 	ret z
+	runtime_assert ReadRow, a < {d:LAST_NOTE}, "Invalid note ID \{a,#\}"
 	ld [hli], a ; Only write the note back if it's not a rest.
-	; TODO: runtime assert that a < LAST_NOTE
 	; If the FX is a tone porta or a note delay, don't play the note yet.
 	ld a, c
 	assert FX_NOTE_DELAY == FX_TONE_PORTA | $04, "Difference between note delay (${x:FX_NOTE_DELAY}) and tone porta (${x:FX_TONE_PORTA}) must be a single bit"
@@ -841,7 +866,8 @@ PlayNoiseNote:
 	ld hl, wCH4.polynom
 	ld [hld], a
 	assert wCH4.polynom - 1 == wCH4.lfsrWidth
-	or [hl] ; The polynom's bit 3 is always reset. (TODO: runtime assert this?)
+	runtime_assert PlayNoiseNote, (a & $08) == 0, "Polynom \{@a,2$\} has bit 3 set!"
+	or [hl] ; The polynom's bit 3 is always reset.
 	ldh [rNR43], a
 	dec hl
 	assert wCH4.lfsrWidth - 1 == wCH4.ctrlMask
@@ -907,6 +933,11 @@ RunTick0Fx:
 ; @param b:  The FX's parameters.
 ; @destroy a bc de hl (potentially)
 
+MACRO No ; For "empty" entries in the JR tables.
+	ret
+	ds 1
+ENDM
+
 ; First, FX code that only runs on tick 0.
 
 FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
@@ -933,7 +964,7 @@ FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
 
 
 FxTonePortaSetup:
-	; TODO: runtime assert that CH4 is not the target.
+	runtime_assert FxTonePortaSetup, c != $08, "Tone porta is not supported on CH4!"
 	; Setup portion: get the target period.
 	ld a, [de]
 	; Compute the target period from the note ID.
@@ -981,9 +1012,9 @@ FxChangeTimbre:
 	jr c, FxChangeTimbre2.ch3
 .ch4
 	; Keep the polynom bits, but replace the LFSR width bit.
+	runtime_assert FxChangeTimbre, (b == 0) || (b == {AUD4POLY_7STEP}), "Invalid argument to FxChangeTimbre for CH4!"
 	ldh a, [rNR43]
 	and ~AUD4POLY_7STEP ; Reset the LFSR width bit.
-	; TODO: runtime assert that this is $00 or AUD4POLY_STEP
 	or b
 	ldh [rNR43], a
 	ret
@@ -1011,11 +1042,11 @@ FxPatternBreak:
 
 
 FxVolumeSlide:
+	runtime_assert FxVolumeSlide, a != $04, "Volume slide is not supported for CH3!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
-	; TODO: runtime assert that CH3 is not the target
 	; Compute a pointer to the volume register.
 	; Doing it this way, courtesy of @nitro2k01, is smaller and faster.
 	; a = 1 for CH1, 2 for CH2, 8 for CH4.
@@ -1167,11 +1198,11 @@ FxArpeggio:
 	ld a, b
 	and a
 	ret z
+	runtime_assert FxArpeggio, a != $08, "Arpeggio is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
-	; TODO: runtime assert that CH4 is not the target
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
@@ -1232,11 +1263,11 @@ NoteCutTick0Trampoline:
 ; And these FX are "continuous" only.
 
 FxPortaUp:
+	runtime_assert FxPortaUp, a != $08, "Porta up is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
-	; TODO: runtime assert that CH4 is not the target
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
@@ -1266,11 +1297,11 @@ FxPortaUp:
 
 
 FxPortaDown:
+	runtime_assert FxPortaDown, a != $08, "Porta down is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
-	; TODO: runtime assert that CH4 is not the target
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
@@ -1323,11 +1354,11 @@ ContinuousFx:
 
 
 FxVibrato:
+	runtime_assert FxVibrato, a != $08, "Vibrato is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
-	; TODO: runtime assert that CH4 is not the target
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
@@ -1368,11 +1399,11 @@ FxVibrato:
 
 ; This is only half of the logic. The other half is in `FxTonePorta2`.
 FxTonePorta:
+	runtime_assert FxTonePorta, a != $08, "Tone porta is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
-	; TODO: runtime assert that CH4 is not the target
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
