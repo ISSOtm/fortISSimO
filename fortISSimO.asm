@@ -616,302 +616,6 @@ ReadRow:
 	cp FX_TONE_PORTA
 	ret
 
-; Starts playing a new note on the channel, writing back its period to the channel's struct.
-; @param a:  ID of the note to play.
-; @param c:  LOW(rNRx3)
-; @param hl: Pointer to the channel's `.period`.
-; @destroy c de hl a
-def PlayNewNote equs "PlayDutyNote.playNewNote"
-
-
-; Used by `FxNoteDelay`, hoisted out to save some space in the web of `jr`s that is FX code.
-; @param c:  The channel's bit mask in the muted/allowed channel bytes.
-; @param d:  The note's ID.
-; @param hl: Pointer to the channel's note byte
-; @destroy c de hl a
-PlaySomeDutyNote:
-	; The duty function expects a few more params.
-	dec hl
-	assert wCH1.note - 1 == wCH1.instrAndFX
-	ld e, c ; Transfer the bit mask, since we already have it.
-	; We must now compute LOW(rNRx4): $10 for CH1, $15 for CH2.
-	srl c ; 00 / 01
-	jr z, :+
-	set 2, c ; 05
-:
-	set 4, c ; 10 / 15
-	; fallthrough
-
-; @param c:  LOW(rNRx0)
-; @param e:  The channel's bit mask in the muted/allowed channel bytes.
-; @param d:  The note's ID.
-; @param hl: Pointer to the channel's fx/instrument byte.
-; @destroy c de hl a
-PlayDutyNote:
-	; If the channel is inhibited, don't perform any writes.
-	ld a, [hUGE_MutedChannels]
-	and e
-	ret nz
-
-	; Let's roll!
-	push de ; Save the note index for later.
-	; First, apply the instrument.
-	ld a, [hli]
-	inc hl
-	assert wCH1.instrAndFX + 2 == wCH1.subPattern
-	and $F0 ; Keep the instrument bits.
-	jr z, .noInstr
-	; Compute the instrument pointer.
-	sub $10 ; Instrument IDs are 1-based.
-	; Pulse instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
-	; TODO: assert that this is the case!
-	rra ; *8 now.
-	rra ; *4 now.
-	ld d, a
-	rra ; *2 now.
-	add a, d ; *2 + *4 = *6, perfect!
-	ld d, a
-	; If the channel is not inhibited, allow it to be used by FX as well.
-	; We can't do this earlier because of register pressure.
-	ldh a, [hUGE_AllowedChannels]
-	or e
-	ldh [hUGE_AllowedChannels], a
-	; Resume computing the instrument pointer.
-	ld a, [wDutyInstrs]
-	add a, d
-	ld e, a
-	ld a, [wDutyInstrs + 1]
-	adc a, 0
-	ld d, a
-	; Perform the instrument's writes.
-	ld a, [de] ; Sweep.
-	ldh [c], a
-	inc c
-	inc de
-	ld a, [de] ; Duty & length.
-	ldh [c], a
-	inc c
-	inc de
-	ld a, [de] ; Volume & envelope.
-	ldh [c], a
-	inc de
-	ld a, [de] ; Subpattern pointer.
-	ld [hli], a
-	inc de
-	ld a, [de]
-	ld [hli], a
-	assert wCH1.subPattern + 2 == wCH1.subPatternRow
-	inc de
-	xor a ; Subpattern row counter.
-	ld [hli], a
-	assert wCH1.subPatternRow + 1 == wCH1.ctrlMask
-	ld a, [de] ; NRx4 mask.
-.writeCtrlMask
-	ld [hli], a
-	assert wCH1.ctrlMask + 1 == wCH1.period
-	inc c ; Skip NRx2.
-
-	; Next, apply the note.
-	pop af ; Retrieve the note ID (from d to a).
-	;; NOTE: aliased as `PlayNewNote`; if modifying this, please check the documentation accordingly.
-	; (An alias is used to keep `.noInstr` below as a local label.)
-.playNewNote
-	; Compute a pointer to the note's period.
-	add a, a
-	add a, LOW(PeriodTable)
-	ld e, a
-	adc a, HIGH(PeriodTable)
-	sub e
-	ld d, a
-	; Write it.
-	ld a, [de] ; LOW(Period).
-	ld [hli], a
-	ldh [c], a
-	inc c ; Skip NRx3.
-	inc de
-	ld a, [de] ; HIGH(Period).
-	ld [hld], a
-	dec hl
-	assert wCH1.period - 1 == wCH1.ctrlMask
-	or [hl] ; OR the "control bits" with the period's high bits.
-	ldh [c], a
-	ret
-
-.noInstr
-	inc c ; Skip NRx0.
-	inc c ; Skip NRx1.
-	inc hl ; Skip subpattern pointer.
-	inc hl
-	inc hl ; Skip subpattern row counter.
-	; Remove trigger bit from ctrl mask.
-	ld a, [hl]
-	res 7, a
-	jr .writeCtrlMask
-
-
-; @param d: The channel's note ID.
-; @destroy c de hl a
-PlayWaveNote:
-	; If the channel is inhibited, don't perform any writes.
-	ld a, [hUGE_MutedChannels]
-	and hUGE_CH3_MASK
-	ret nz
-
-	; First, apply the instrument.
-	ld a, [wCH3.instrAndFX]
-	and $F0 ; Keep the instrument bits.
-	ld hl, wCH3.ctrlMask
-	jr z, .noWaveInstr
-	; Compute the instrument pointer.
-	sub $10 ; Instrument IDs are 1-based.
-	; Wave instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
-	; TODO: assert that this is the case!
-	rra ; *8 now.
-	rra ; *4 now.
-	ld e, a
-	rra ; *2 now.
-	add a, e ; *2 + *4 = *6, perfect!
-	ld e, a
-	ld hl, wWaveInstrs
-	ld a, [hli]
-	add a, e
-	ld e, a
-	adc a, [hl]
-	sub e
-	ld h, a
-	ld l, e
-	; If the channel is not inhibited, allow it to be used by FX as well.
-	ldh a, [hUGE_AllowedChannels]
-	or hUGE_CH3_MASK
-	ldh [hUGE_AllowedChannels], a
-	; Perform the instrument's writes.
-	ld a, [hli] ; Length.
-	ldh [rNR31], a
-	ld a, [hli] ; Volume & envelope.
-	ldh [rNR32], a
-	ld a, [hli] ; Read wave ID for later. TODO: move it last!
-	ld e, a
-	ld a, [hli] ; Subpattern pointer.
-	ld [wCH3.subPattern], a
-	ld a, [hli]
-	ld [wCH3.subPattern + 1], a
-	xor a ; Subpattern row counter.
-	ld [wCH3.subPatternRow], a
-	ld a, [hl] ; NRx4 mask.
-	ld [wCH3.ctrlMask], a
-	; Check if a new wave must be loaded.
-	ld a, [hUGE_LoadedWaveID]
-	cp e
-	call nz, LoadWave
-	db $21 ; ld hl, <res 7, [hl]> ; This is OK because HL does not get used below.
-.noWaveInstr
-	res 7, [hl] ; If no instrument, remove trigger bit from control mask.
-
-	; Next, apply the note.
-	ld a, d ; Retrieve the note ID.
-	; Compute a pointer to the note's period.
-	add a, a
-	add a, LOW(PeriodTable)
-	ld e, a
-	adc a, HIGH(PeriodTable)
-	sub e
-	ld d, a
-	; Careful—triggering CH3 while it's reading wave RAM can corrupt it.
-	; We first kill the channel, and re-enable it, which has it enabled but not playing.
-	ld hl, rNR30
-	ld [hl], l ; This has bit 7 reset, killing the channel.
-	ld [hl], h ; This has bit 7 set, re-enabling the channel.
-	; Write it.
-	ld hl, wCH3.period
-	ld a, [de] ; LOW(Period).
-	ld [hli], a
-	inc de
-	ldh [rNR33], a
-	ld a, [de] ; HIGH(Period).
-	ld [hld], a
-	dec hl
-	assert wCH3.period - 1 == wCH3.ctrlMask
-	or [hl] ; OR the "control bits" with the period's high bits.
-	ldh [rNR34], a
-	ret
-
-; @param d: The channel's note ID.
-; @destroy c de hl a
-PlayNoiseNote:
-	; If the channel is inhibited, don't perform any writes.
-	ld a, [hUGE_MutedChannels]
-	and hUGE_CH4_MASK
-	ret nz
-
-	; First, apply the instrument.
-	ld a, [wCH4.instrAndFX]
-	and $F0 ; Keep the instrument bits.
-	ld hl, wCH4.ctrlMask
-	jr z, .noNoiseInstr
-	; Compute the instrument pointer.
-	sub $10 ; Instrument IDs are 1-based.
-	; Noise instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
-	; TODO: assert that this is the case!
-	; TODO: 2 of those bytes are unused! This would also simplify the code below (3b/3c).
-	rra ; *8 now.
-	rra ; *4 now.
-	ld e, a
-	rra ; *2 now.
-	add a, e ; *2 + *4 = *6, perfect!
-	ld e, a
-	ld hl, wNoiseInstrs
-	ld a, [hli]
-	add a, e
-	ld e, a
-	adc a, [hl]
-	sub e
-	ld h, a
-	ld l, e
-	; If the channel is not inhibited, allow it to be used by FX as well.
-	ldh a, [hUGE_AllowedChannels]
-	or hUGE_CH4_MASK
-	ldh [hUGE_AllowedChannels], a
-	; Perform the instrument's writes.
-	ld a, [hli] ; Volume & envelope.
-	ldh [rNR42], a
-	ld a, [hli] ; Subpattern pointer.
-	ld [wCH4.subPattern], a
-	ld a, [hli]
-	ld [wCH4.subPattern + 1], a
-	xor a ; Subpattern row counter.
-	ld [wCH4.subPatternRow], a
-	ld a, [hl] ; LFSR width & length bit & length.
-	and $3F ; Only keep the length bits.
-	ldh [rNR41], a
-	; What follows is a somewhat complicated dance that saves 1 cycle over loading from [hl] then
-	; ANDing the desired bit twice. Totally worth it, if only because it looks cool af.
-	xor [hl] ; Only keep the other two bits (bits 7 and 6).
-	rlca ; LFSR width is in bit 0 and carry now.
-	srl a ; LFSR width is in carry, and a contains only the length enable in bit 6.
-	set 7, a ; Set trigger bit.
-	ld [wCH4.ctrlMask], a
-	sbc a, a ; All bits are LFSR width now.
-	and AUD4POLY_7STEP
-	ld [wCH4.lfsrWidth], a
-	db $DC ; call c, <res 7, [hl]>
-.noNoiseInstr
-	res 7, [hl] ; If no instrument, remove trigger bit from control mask.
-
-	; Next, apply the note.
-	ld a, d
-	call GetNoisePolynom
-	ld hl, wCH4.polynom
-	ld [hld], a
-	assert wCH4.polynom - 1 == wCH4.lfsrWidth
-	runtime_assert PlayNoiseNote, (a & $08) == 0, "Polynom \{@a,2$\} has bit 3 set!"
-	or [hl] ; The polynom's bit 3 is always reset.
-	ldh [rNR43], a
-	dec hl
-	assert wCH4.lfsrWidth - 1 == wCH4.ctrlMask
-	ld a, [hl]
-	ldh [rNR44], a
-	ret
-
 
 ; @param e: The ID of the wave to load.
 ; @destroy hl a
@@ -940,6 +644,14 @@ LoadWave:
 	ld a, AUD3ENA_ON
 	ldh [rNR30], a ; Re-enable CH3's DAC.
 	ret
+
+
+; Starts playing a new note on the channel, writing back its period to the channel's struct.
+; @param a:  ID of the note to play.
+; @param c:  LOW(rNRx3)
+; @param hl: Pointer to the channel's `.period`.
+; @destroy c de hl a
+def PlayNewNote equs "PlayDutyNote.playNewNote"
 
 
 ; @param de: Pointer to the channel's FX params.
@@ -1240,7 +952,7 @@ FxSetVolume:
 	ret
 
 
-; Finally, the effects that run the same regardless of first tick or not
+; Finally, the effects that run the same regardless of first tick or not.
 
 FxArpeggio:
 	; `000` is an empty row, even on CH4. Make it do nothing, as it would glitch out on CH4.
@@ -1524,7 +1236,7 @@ FxNoteDelay:
 	bit 3, c
 	jp nz, PlayNoiseNote
 	bit 2, c
-	jp z, PlaySomeDutyNote ; This is more likely to be followed than just CH3.
+	jr z, PlaySomeDutyNote ; This is more likely to be followed than just CH3, and it's cheaper.
 	jp nz, PlayWaveNote ; I just want to annoy disassemblers. :3
 
 
@@ -1613,6 +1325,295 @@ FxTonePorta2:
 	or [hl]
 	res 7, a ; We don't want to trigger the channel.
 	ldh [c], a
+	ret
+
+
+; Used by `FxNoteDelay`, hoisted out to save some space in the web of `jr`s that is FX code.
+; @param c:  The channel's bit mask in the muted/allowed channel bytes.
+; @param d:  The note's ID.
+; @param hl: Pointer to the channel's note byte
+; @destroy c de hl a
+PlaySomeDutyNote:
+	; The duty function expects a few more params.
+	dec hl
+	assert wCH1.note - 1 == wCH1.instrAndFX
+	ld e, c ; Transfer the bit mask, since we already have it.
+	; We must now compute LOW(rNRx4): $10 for CH1, $15 for CH2.
+	srl c ; 00 / 01
+	jr z, :+
+	set 2, c ; 05
+:
+	set 4, c ; 10 / 15
+	; fallthrough
+
+; @param c:  LOW(rNRx0)
+; @param e:  The channel's bit mask in the muted/allowed channel bytes.
+; @param d:  The note's ID.
+; @param hl: Pointer to the channel's fx/instrument byte.
+; @destroy c de hl a
+PlayDutyNote:
+	; If the channel is inhibited, don't perform any writes.
+	ld a, [hUGE_MutedChannels]
+	and e
+	ret nz
+
+	; Let's roll!
+	push de ; Save the note index for later.
+	; First, apply the instrument.
+	ld a, [hli]
+	inc hl
+	assert wCH1.instrAndFX + 2 == wCH1.subPattern
+	and $F0 ; Keep the instrument bits.
+	jr z, .noInstr
+	; Compute the instrument pointer.
+	sub $10 ; Instrument IDs are 1-based.
+	; Pulse instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
+	; TODO: assert that this is the case!
+	rra ; *8 now.
+	rra ; *4 now.
+	ld d, a
+	rra ; *2 now.
+	add a, d ; *2 + *4 = *6, perfect!
+	ld d, a
+	; If the channel is not inhibited, allow it to be used by FX as well.
+	; We can't do this earlier because of register pressure.
+	ldh a, [hUGE_AllowedChannels]
+	or e
+	ldh [hUGE_AllowedChannels], a
+	; Resume computing the instrument pointer.
+	ld a, [wDutyInstrs]
+	add a, d
+	ld e, a
+	ld a, [wDutyInstrs + 1]
+	adc a, 0
+	ld d, a
+	; Perform the instrument's writes.
+	ld a, [de] ; Sweep.
+	ldh [c], a
+	inc c
+	inc de
+	ld a, [de] ; Duty & length.
+	ldh [c], a
+	inc c
+	inc de
+	ld a, [de] ; Volume & envelope.
+	ldh [c], a
+	inc de
+	ld a, [de] ; Subpattern pointer.
+	ld [hli], a
+	inc de
+	ld a, [de]
+	ld [hli], a
+	assert wCH1.subPattern + 2 == wCH1.subPatternRow
+	inc de
+	xor a ; Subpattern row counter.
+	ld [hli], a
+	assert wCH1.subPatternRow + 1 == wCH1.ctrlMask
+	ld a, [de] ; NRx4 mask.
+.writeCtrlMask
+	ld [hli], a
+	assert wCH1.ctrlMask + 1 == wCH1.period
+	inc c ; Skip NRx2.
+
+	; Next, apply the note.
+	pop af ; Retrieve the note ID (from d to a).
+	;; NOTE: aliased as `PlayNewNote`; if modifying this, please check the documentation accordingly.
+	; (An alias is used to keep `.noInstr` below as a local label.)
+.playNewNote
+	; Compute a pointer to the note's period.
+	add a, a
+	add a, LOW(PeriodTable)
+	ld e, a
+	adc a, HIGH(PeriodTable)
+	sub e
+	ld d, a
+	; Write it.
+	ld a, [de] ; LOW(Period).
+	ld [hli], a
+	ldh [c], a
+	inc c ; Skip NRx3.
+	inc de
+	ld a, [de] ; HIGH(Period).
+	ld [hld], a
+	dec hl
+	assert wCH1.period - 1 == wCH1.ctrlMask
+	or [hl] ; OR the "control bits" with the period's high bits.
+	ldh [c], a
+	ret
+
+.noInstr
+	inc c ; Skip NRx0.
+	inc c ; Skip NRx1.
+	inc hl ; Skip subpattern pointer.
+	inc hl
+	inc hl ; Skip subpattern row counter.
+	; Remove trigger bit from ctrl mask.
+	ld a, [hl]
+	res 7, a
+	jr .writeCtrlMask
+
+
+; @param d: The channel's note ID.
+; @destroy c de hl a
+PlayWaveNote:
+	; If the channel is inhibited, don't perform any writes.
+	ld a, [hUGE_MutedChannels]
+	and hUGE_CH3_MASK
+	ret nz
+
+	; First, apply the instrument.
+	ld a, [wCH3.instrAndFX]
+	and $F0 ; Keep the instrument bits.
+	ld hl, wCH3.ctrlMask
+	jr z, .noWaveInstr
+	; Compute the instrument pointer.
+	sub $10 ; Instrument IDs are 1-based.
+	; Wave instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
+	; TODO: assert that this is the case!
+	rra ; *8 now.
+	rra ; *4 now.
+	ld e, a
+	rra ; *2 now.
+	add a, e ; *2 + *4 = *6, perfect!
+	ld e, a
+	ld hl, wWaveInstrs
+	ld a, [hli]
+	add a, e
+	ld e, a
+	adc a, [hl]
+	sub e
+	ld h, a
+	ld l, e
+	; If the channel is not inhibited, allow it to be used by FX as well.
+	ldh a, [hUGE_AllowedChannels]
+	or hUGE_CH3_MASK
+	ldh [hUGE_AllowedChannels], a
+	; Perform the instrument's writes.
+	ld a, [hli] ; Length.
+	ldh [rNR31], a
+	ld a, [hli] ; Volume & envelope.
+	ldh [rNR32], a
+	ld a, [hli] ; Read wave ID for later. TODO: move it last!
+	ld e, a
+	ld a, [hli] ; Subpattern pointer.
+	ld [wCH3.subPattern], a
+	ld a, [hli]
+	ld [wCH3.subPattern + 1], a
+	xor a ; Subpattern row counter.
+	ld [wCH3.subPatternRow], a
+	ld a, [hl] ; NRx4 mask.
+	ld [wCH3.ctrlMask], a
+	; Check if a new wave must be loaded.
+	ld a, [hUGE_LoadedWaveID]
+	cp e
+	call nz, LoadWave
+	db $21 ; ld hl, <res 7, [hl]> ; This is OK because HL does not get used below.
+.noWaveInstr
+	res 7, [hl] ; If no instrument, remove trigger bit from control mask.
+
+	; Next, apply the note.
+	ld a, d ; Retrieve the note ID.
+	; Compute a pointer to the note's period.
+	add a, a
+	add a, LOW(PeriodTable)
+	ld e, a
+	adc a, HIGH(PeriodTable)
+	sub e
+	ld d, a
+	; Careful—triggering CH3 while it's reading wave RAM can corrupt it.
+	; We first kill the channel, and re-enable it, which has it enabled but not playing.
+	ld hl, rNR30
+	ld [hl], l ; This has bit 7 reset, killing the channel.
+	ld [hl], h ; This has bit 7 set, re-enabling the channel.
+	; Write it.
+	ld hl, wCH3.period
+	ld a, [de] ; LOW(Period).
+	ld [hli], a
+	inc de
+	ldh [rNR33], a
+	ld a, [de] ; HIGH(Period).
+	ld [hld], a
+	dec hl
+	assert wCH3.period - 1 == wCH3.ctrlMask
+	or [hl] ; OR the "control bits" with the period's high bits.
+	ldh [rNR34], a
+	ret
+
+; @param d: The channel's note ID.
+; @destroy c de hl a
+PlayNoiseNote:
+	; If the channel is inhibited, don't perform any writes.
+	ld a, [hUGE_MutedChannels]
+	and hUGE_CH4_MASK
+	ret nz
+
+	; First, apply the instrument.
+	ld a, [wCH4.instrAndFX]
+	and $F0 ; Keep the instrument bits.
+	ld hl, wCH4.ctrlMask
+	jr z, .noNoiseInstr
+	; Compute the instrument pointer.
+	sub $10 ; Instrument IDs are 1-based.
+	; Noise instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
+	; TODO: assert that this is the case!
+	; TODO: 2 of those bytes are unused! This would also simplify the code below (3b/3c).
+	rra ; *8 now.
+	rra ; *4 now.
+	ld e, a
+	rra ; *2 now.
+	add a, e ; *2 + *4 = *6, perfect!
+	ld e, a
+	ld hl, wNoiseInstrs
+	ld a, [hli]
+	add a, e
+	ld e, a
+	adc a, [hl]
+	sub e
+	ld h, a
+	ld l, e
+	; If the channel is not inhibited, allow it to be used by FX as well.
+	ldh a, [hUGE_AllowedChannels]
+	or hUGE_CH4_MASK
+	ldh [hUGE_AllowedChannels], a
+	; Perform the instrument's writes.
+	ld a, [hli] ; Volume & envelope.
+	ldh [rNR42], a
+	ld a, [hli] ; Subpattern pointer.
+	ld [wCH4.subPattern], a
+	ld a, [hli]
+	ld [wCH4.subPattern + 1], a
+	xor a ; Subpattern row counter.
+	ld [wCH4.subPatternRow], a
+	ld a, [hl] ; LFSR width & length bit & length.
+	and $3F ; Only keep the length bits.
+	ldh [rNR41], a
+	; What follows is a somewhat complicated dance that saves 1 cycle over loading from [hl] then
+	; ANDing the desired bit twice. Totally worth it, if only because it looks cool af.
+	xor [hl] ; Only keep the other two bits (bits 7 and 6).
+	rlca ; LFSR width is in bit 0 and carry now.
+	srl a ; LFSR width is in carry, and a contains only the length enable in bit 6.
+	set 7, a ; Set trigger bit.
+	ld [wCH4.ctrlMask], a
+	sbc a, a ; All bits are LFSR width now.
+	and AUD4POLY_7STEP
+	ld [wCH4.lfsrWidth], a
+	db $DC ; call c, <res 7, [hl]>
+.noNoiseInstr
+	res 7, [hl] ; If no instrument, remove trigger bit from control mask.
+
+	; Next, apply the note.
+	ld a, d
+	call GetNoisePolynom
+	ld hl, wCH4.polynom
+	ld [hld], a
+	assert wCH4.polynom - 1 == wCH4.lfsrWidth
+	runtime_assert PlayNoiseNote, (a & $08) == 0, "Polynom \{@a,2$\} has bit 3 set!"
+	or [hl] ; The polynom's bit 3 is always reset.
+	ldh [rNR43], a
+	dec hl
+	assert wCH4.lfsrWidth - 1 == wCH4.ctrlMask
+	ld a, [hl]
+	ldh [rNR44], a
 	ret
 
 
