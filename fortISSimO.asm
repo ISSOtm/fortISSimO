@@ -498,7 +498,7 @@ TickSubpattern:
 	; However, a fifth bit is required to address all 32 rows, and that's the note's 7th bit.
 	ld a, [hli]
 	rlca ; Shift bit 7 into bit 0
-	runtime_assert TickSubpattern, [((([hl] & $0F) * 2) + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
+	runtime_assert TickSubpattern, [(([hl] & $0F) * 2 + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
 	ld b, [hl] ; Read the row's FX byte.
 	inc hl
 	xor b
