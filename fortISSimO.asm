@@ -745,26 +745,6 @@ KnownRet:
 	ret
 
 
-; Must not alter its params so that it can be used in `SubpatternFxVibrato` (or that one must `push`).
-FxResetVibCounter:
-	ld hl, wCH1.vibratoPrevArg - wCH1.note
-	add hl, de
-	; If the previous vibrato arg was the same as this one, simply continue it.
-	ld a, b
-	cp [hl]
-	ret z
-	; Write this vibrato's argument, then.
-	ld [hld], a
-	assert wCH1.vibratoPrevArg - 1 == wCH1.vibratoState
-	; On the first tick, we will underflow the counter, and the direction will flip to "positive".
-	xor a
-	ld [hld], a ; Write the counter and the direction bit.
-	assert wCH1.vibratoState - 1 == wCH1.vibratoOffset
-	; Start at no offset.
-	ld [hl], a
-	ret
-
-
 ; This one is slightly out of order so it can `jr FxChangeTimbre2.chX`.
 
 ; For CH1 and CH2, this is written as-is to NRx1;
@@ -869,6 +849,22 @@ FxVolumeSlide:
 	ret
 
 
+FxPosJump:
+	; Writing to `orderIdx` directly is safe, because it is only read by `ReadRow`,
+	; all calls to which happen before any FX processing. (The rows are cached in RAM.)
+	ld hl, wOrderIdx
+	ld a, b
+	ld [hli], a
+	; Set the necessary bits to make this non-zero;
+	; if a row is already being forced, this keeps it, but will select row 0 otherwise.
+	inc hl
+	assert wOrderIdx + 2 == wForceRow
+	assert LOW(-PATTERN_LENGTH) == $C0 ; Set the corresponding bits.
+	set 7, [hl]
+	set 6, [hl]
+	ret
+
+
 ; The jump table is in the middle of the functions so that backwards `jr`s can be used as well as forwards.
 Tick0Fx:
 	To FxArpeggio, from Tick0Fx
@@ -892,22 +888,6 @@ FxSetSpeed:
 	; We want the new tempo to take effect immediately; so, we must reload the timer as well.
 	; This is easy to do, since we are on tick 0.
 	ld [wRowTimer], a
-	ret
-
-
-FxPosJump:
-	; Writing to `orderIdx` directly is safe, because it is only read by `ReadRow`,
-	; all calls to which happen before any FX processing. (The rows are cached in RAM.)
-	ld hl, wOrderIdx
-	ld a, b
-	ld [hli], a
-	; Set the necessary bits to make this non-zero;
-	; if a row is already being forced, this keeps it, but will select row 0 otherwise.
-	inc hl
-	assert wOrderIdx + 2 == wForceRow
-	assert LOW(-PATTERN_LENGTH) == $C0 ; Set the corresponding bits.
-	set 7, [hl]
-	set 6, [hl]
 	ret
 
 
@@ -1001,6 +981,17 @@ FxArpeggio:
 	ld hl, wCH1.period - wCH1.note
 	add hl, de
 	jp PlayNewNote
+
+
+; This is here so that its `jr`s can reach their targets.
+FxResetVibCounter:
+	ld hl, wCH1.vibratoPrevArg - wCH1.note
+	add hl, de
+	; If the previous vibrato arg was the same as this one, simply continue it.
+	ld a, b
+	cp [hl]
+	jr z, FxVibrato
+	jr PlayNewVib
 
 
 FxCallRoutine:
@@ -1124,6 +1115,18 @@ ContinuousFx:
 
 ; Tone porta is a bit below, so that it's closer to `FxTonePorta2`.
 
+
+PlayNewVib:
+	; Write this vibrato's argument, then.
+	ld [hld], a
+	assert wCH1.vibratoPrevArg - 1 == wCH1.vibratoState
+	; On the first tick, we will underflow the counter, and the direction will flip to "positive".
+	xor a
+	ld [hld], a ; Write the counter and the direction bit.
+	assert wCH1.vibratoState - 1 == wCH1.vibratoOffset
+	; Start at no offset.
+	ld [hl], a
+	; fallthrough
 
 FxVibrato:
 	runtime_assert FxVibrato, a != $08, "Vibrato is not supported on CH4!"
