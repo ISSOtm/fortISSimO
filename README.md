@@ -17,7 +17,21 @@ It has, however, a few differences:
   Please use `1xx` and `2xx` instead.
 - The instrument field is ignored on a row that contain a toneporta effect (`3`).
   hUGEDriver reloads the instrument instead.
-- Since the driver's internals are different, routines are **not** compatible between hUGEDriver and fortISSimO.
+
+### Routines
+
+<details><summary>fortISSimO uses a different approach to routines than hUGEDriver.</summary>
+
+Namely, fortISSimO only supports a *single* routine per song!
+It is, however, passed the full argument, so it can perform dispatch on its own.
+
+On top of the above, due to the drivers' internals being vastly different, routines are **not** compatible between hUGEDriver and fortISSimO.
+
+The interface of routines (parameters, accessible variables, etc.) is not documented here, because it may vary from driver version to driver version.
+If you are advanced enough to write routines, I trust that you should be able to figure everything out by starting from `FxCallRoutine`.
+(If not, please feel free to contact me, and/or open an issue on fortISSimO's GitHub repo.)
+
+</details>
 
 ## Quick start
 

@@ -162,8 +162,8 @@ hUGE_StartSong::
 	assert wLastPatternIdx + 1 == wDutyInstrs
 	assert wDutyInstrs + 2 == wWaveInstrs
 	assert wWaveInstrs + 2 == wNoiseInstrs
-	assert wNoiseInstrs + 2 == wRoutines
-	assert wRoutines + 2 == wWaves
+	assert wNoiseInstrs + 2 == wRoutine
+	assert wRoutine + 2 == wWaves
 	ld c, 2 + 2 + 2 + 2 + 2
 .copyPointers
 	inc de
@@ -995,14 +995,8 @@ FxResetVibCounter:
 
 
 FxCallRoutine:
-	; Compute pointer to the routine.
-	ld a, b
-	add a, LOW(wRoutines)
-	ld l, a
-	adc a, HIGH(wRoutines)
-	sub l
-	ld h, a
-	; Deref the pointer, and call it.
+	; Read the pointer to the routine, and call it.
+	ld hl, wRoutine
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
@@ -1740,7 +1734,7 @@ wDutyInstrs: dw
 wWaveInstrs: dw
 wNoiseInstrs: dw
 
-wRoutines: dw
+wRoutine: dw
 
 wWaves: dw
 
