@@ -8,7 +8,7 @@
 ;    and make sure to write the hUGETracker version between quotation marks.
 ;    For example, you'd get:   DEF HUGETRACKER equs "1.0"
 ;
-; DEF HUGETRACKER equs ""
+; DEF HUGETRACKER equs "1.0"
 
 IF DEF(HUGETRACKER)
 	WARN "\n\tPlease report this issue to fortISSimO, *NOT* hUGETracker!\n\t(Even if it seems unrelated.)\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<\n\t"
@@ -228,7 +228,7 @@ ENDC
 	; Although strictly speaking, init'ing the subpattern row is unnecessary, it's still read before
 	; the NULL check is performed; doing this silences any spurious "uninit'd RAM read" exceptions.
 	ld [hli], a
-	assert wCH1.subPatternRow + 1 == wCH1.ctrlMask
+	assert wCH1.subPatternRow + 1 == wCH1.lengthBit
 	; Same as above.
 	ld [hli], a
 	; Then, we have the 4 channel-dependent bytes
@@ -239,7 +239,7 @@ ENDC
 	adc a, h
 	sub l
 	ld h, a
-	assert wCH1.ctrlMask + 1 + 5 == wCH2
+	assert wCH1.lengthBit + 1 + 5 == wCH2
 
 	dec c ; Are we done?
 	jr nz, .initChannel
@@ -396,41 +396,40 @@ ENDC
 	ld de, wCH1.fxParams
 	ld c, hUGE_CH1_MASK
 	call RunTick0Fx
-	ld hl, wCH1.ctrlMask
+	ld hl, wCH1.lengthBit
 	ld c, hUGE_CH1_MASK
 	call TickSubpattern
 
 	ld de, wCH2.fxParams
 	ld c, hUGE_CH2_MASK
 	call RunTick0Fx
-	ld hl, wCH2.ctrlMask
+	ld hl, wCH2.lengthBit
 	ld c, hUGE_CH2_MASK
 	call TickSubpattern
 
 	ld de, wCH3.fxParams
 	ld c, hUGE_CH3_MASK
 	call RunTick0Fx
-	ld hl, wCH3.ctrlMask
+	ld hl, wCH3.lengthBit
 	ld c, hUGE_CH3_MASK
 	call TickSubpattern
 
 	ld de, wCH4.fxParams
 	ld c, hUGE_CH4_MASK
 	call RunTick0Fx
-	ld hl, wCH4.ctrlMask
+	ld hl, wCH4.lengthBit
 	ld c, hUGE_CH4_MASK
 	assert @ == TickSubpattern ; fallthrough
 
 
-; @param hl: Pointer to the channel's "control mask".
+; @param hl: Pointer to the channel's length bit.
 ; @param c:  The channel's mask (the CHx_MASK constant).
 ; @destroy a bc de hl (potentially)
 TickSubpattern:
 	; TODO: change the way it's generated to eliminate `.subPatternRow`.
-	ld a, [hld] ; Read the "control mask".
-	res 7, a ; We don't want to retrigger the channel.
+	ld a, [hld] ; Read the length bit.
 	ld b, a
-	assert wCH1.ctrlMask - 1 == wCH1.subPatternRow
+	assert wCH1.lengthBit - 1 == wCH1.subPatternRow
 	ld a, [hl]
 	ld e, a
 	add a, 3 ; Switch to next row.
@@ -482,12 +481,12 @@ TickSubpattern:
 	cp LOW(rNR23)
 	adc a, c ; 13, 18, 1D
 	ld c, a
-	; Write the period, together with the control mask.
+	; Write the period, together with the length bit.
 	ld a, [de]
 	ldh [c], a
 	inc c
 	ld a, [de]
-	or b ; Add the "control" bits.
+	or b ; Add the length bit.
 	ldh [c], a
 	pop bc ; Retrieve the channel mask.
 .noNoteOffset
@@ -716,7 +715,7 @@ FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
 	ld hl, wCH3.period + 1
 	ld a, [hld] ; It's annoying that these bits are there, but that's how it is.
 	dec hl
-	assert wCH3.period + 1 - 2 == wCH3.ctrlMask
+	assert wCH3.period + 1 - 2 == wCH3.lengthBit
 	or [hl]
 	or $80
 	ldh [rNR34], a
@@ -1032,12 +1031,11 @@ FxPortaUp:
 	cp LOW(rNR23)
 	adc a, c ; 13, 18, 1D
 	ld c, a
-	; Cache control mask for writing to NRx4.
-	ld hl, wCH1.ctrlMask - wCH1.note
+	; Cache length bit for writing to NRx4.
+	ld hl, wCH1.lengthBit - wCH1.note
 	add hl, de
 	ld a, [hli]
-	assert wCH1.ctrlMask + 1 == wCH1.period
-	res 7, a ; Remove trigger bit.
+	assert wCH1.lengthBit + 1 == wCH1.period
 	ld e, a
 	; Add param to period, writing it back & to NRx3/4.
 	ld a, [hl]
@@ -1048,7 +1046,7 @@ FxPortaUp:
 	ld a, 0
 	adc a, [hl]
 	ld [hl], a
-	or e ; Add control mask.
+	or e ; Add the length bit.
 	ldh [c], a
 	ret
 
@@ -1066,12 +1064,11 @@ FxPortaDown:
 	cp LOW(rNR23)
 	adc a, c ; 13, 18, 1D
 	ld c, a
-	; Cache control mask for writing to NRx4.
-	ld hl, wCH1.ctrlMask - wCH1.note
+	; Cache length bit for writing to NRx4.
+	ld hl, wCH1.lengthBit - wCH1.note
 	add hl, de
 	ld a, [hli]
-	assert wCH1.ctrlMask + 1 == wCH1.period
-	res 7, a ; Remove trigger bit.
+	assert wCH1.lengthBit + 1 == wCH1.period
 	ld e, a
 	; Add param to period, writing it back & to NRx3/4.
 	ld a, [hl]
@@ -1082,7 +1079,7 @@ FxPortaDown:
 	sbc a, a
 	add a, [hl]
 	ld [hl], a
-	or e ; Add control mask.
+	or e ; Add length bit.
 	ldh [c], a
 	ret
 
@@ -1170,14 +1167,13 @@ FxVibrato:
 	ld d, [hl] ; Read HIGH(period).
 	dec hl
 	ld a, [hld] ; Read LOW(period).
-	assert wCH1.period - 1 == wCH1.ctrlMask
+	assert wCH1.period - 1 == wCH1.lengthBit
 	add a, e
 	ldh [c], a
 	inc c
 	ld a, 0
 	adc a, d
 	or [hl] ; Add the control bits.
-	res 7, a ; Don't retrigger the note.
 	ldh [c], a
 	ret
 
@@ -1329,9 +1325,8 @@ FxTonePorta2:
 	ld a, d
 	ld [hld], a
 	dec hl
-	assert wCH1.period - 1 == wCH1.ctrlMask
+	assert wCH1.period - 1 == wCH1.lengthBit
 	or [hl]
-	res 7, a ; We don't want to trigger the channel.
 	ldh [c], a
 	ret
 
@@ -1416,11 +1411,12 @@ PlayDutyNote:
 	inc de
 	xor a ; Subpattern row counter.
 	ld [hli], a
-	assert wCH1.subPatternRow + 1 == wCH1.ctrlMask
+	assert wCH1.subPatternRow + 1 == wCH1.lengthBit
 	ld a, [de] ; NRx4 mask.
-.writeCtrlMask
+	runtime_assert PlayDutyNote, @a & $80, "Instrument without trigger bit!"
 	ld [hli], a
-	assert wCH1.ctrlMask + 1 == wCH1.period
+.skippedInstr
+	assert wCH1.lengthBit + 1 == wCH1.period
 	inc c ; Skip NRx2.
 
 	; Next, apply the note.
@@ -1444,9 +1440,10 @@ PlayDutyNote:
 	ld a, [de] ; HIGH(Period).
 	ld [hld], a
 	dec hl
-	assert wCH1.period - 1 == wCH1.ctrlMask
+	assert wCH1.period - 1 == wCH1.lengthBit
 	or [hl] ; OR the "control bits" with the period's high bits.
 	ldh [c], a
+	res 7, [hl] ; The only "control bit" that should persist is the length enable.
 	ret
 
 .noInstr
@@ -1455,10 +1452,8 @@ PlayDutyNote:
 	inc hl ; Skip subpattern pointer.
 	inc hl
 	inc hl ; Skip subpattern row counter.
-	; Remove trigger bit from ctrl mask.
-	ld a, [hl]
-	res 7, a
-	jr .writeCtrlMask
+	inc hl ; Skip length bit.
+	jr .skippedInstr
 
 
 ; @param d: The channel's note ID.
@@ -1472,7 +1467,7 @@ PlayWaveNote:
 	; First, apply the instrument.
 	ld a, [wCH3.instrAndFX]
 	and $F0 ; Keep the instrument bits.
-	ld hl, wCH3.ctrlMask
+	ld hl, wCH3.lengthBit
 	jr z, .noWaveInstr
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
@@ -1510,14 +1505,13 @@ PlayWaveNote:
 	xor a ; Subpattern row counter.
 	ld [wCH3.subPatternRow], a
 	ld a, [hl] ; NRx4 mask.
-	ld [wCH3.ctrlMask], a
+	runtime_assert PlayWaveNote, @a & $80, "Instrument without trigger bit!"
+	ld [wCH3.lengthBit], a
 	; Check if a new wave must be loaded.
 	ld a, [hUGE_LoadedWaveID]
 	cp e
 	call nz, LoadWave
-	db $21 ; ld hl, <res 7, [hl]> ; This is OK because HL does not get used below.
 .noWaveInstr
-	res 7, [hl] ; If no instrument, remove trigger bit from control mask.
 
 	; Next, apply the note.
 	ld a, d ; Retrieve the note ID.
@@ -1542,9 +1536,10 @@ PlayWaveNote:
 	ld a, [de] ; HIGH(Period).
 	ld [hld], a
 	dec hl
-	assert wCH3.period - 1 == wCH3.ctrlMask
+	assert wCH3.period - 1 == wCH3.lengthBit
 	or [hl] ; OR the "control bits" with the period's high bits.
 	ldh [rNR34], a
+	res 7, [hl] ; The only "control bit" that should persist is the length enable.
 	ret
 
 ; @param d: The channel's note ID.
@@ -1558,7 +1553,7 @@ PlayNoiseNote:
 	; First, apply the instrument.
 	ld a, [wCH4.instrAndFX]
 	and $F0 ; Keep the instrument bits.
-	ld hl, wCH4.ctrlMask
+	ld hl, wCH4.lengthBit
 	jr z, .noNoiseInstr
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
@@ -1601,13 +1596,11 @@ PlayNoiseNote:
 	rlca ; LFSR width is in bit 0 and carry now.
 	srl a ; LFSR width is in carry, and a contains only the length enable in bit 6.
 	set 7, a ; Set trigger bit.
-	ld [wCH4.ctrlMask], a
+	ld [wCH4.lengthBit], a
 	sbc a, a ; All bits are LFSR width now.
 	and AUD4POLY_7STEP
 	ld [wCH4.lfsrWidth], a
-	db $DC ; call c, <res 7, [hl]>
 .noNoiseInstr
-	res 7, [hl] ; If no instrument, remove trigger bit from control mask.
 
 	; Next, apply the note.
 	ld a, d
@@ -1619,9 +1612,10 @@ PlayNoiseNote:
 	or [hl] ; The polynom's bit 3 is always reset.
 	ldh [rNR43], a
 	dec hl
-	assert wCH4.lfsrWidth - 1 == wCH4.ctrlMask
+	assert wCH4.lfsrWidth - 1 == wCH4.lengthBit
 	ld a, [hl]
 	ldh [rNR44], a
+	res 7, [hl] ; The only "control bit" that should persist is the length enable.
 	ret
 
 
@@ -1663,28 +1657,28 @@ ContinueFx: ; TODO: if this is short enough, swapping it with the other path may
 	ld hl, wCH1.fxParams
 	ld c, hUGE_CH1_MASK
 	call .runFx
-	ld hl, wCH1.ctrlMask
+	ld hl, wCH1.lengthBit
 	ld c, hUGE_CH1_MASK
 	call TickSubpattern
 
 	ld hl, wCH2.fxParams
 	ld c, hUGE_CH2_MASK
 	call .runFx
-	ld hl, wCH2.ctrlMask
+	ld hl, wCH2.lengthBit
 	ld c, hUGE_CH2_MASK
 	call TickSubpattern
 
 	ld hl, wCH3.fxParams
 	ld c, hUGE_CH3_MASK
 	call .runFx
-	ld hl, wCH3.ctrlMask
+	ld hl, wCH3.lengthBit
 	ld c, hUGE_CH3_MASK
 	call TickSubpattern
 
 	ld hl, wCH4.fxParams
 	ld c, hUGE_CH4_MASK
 	call .runFx
-	ld hl, wCH4.ctrlMask
+	ld hl, wCH4.lengthBit
 	ld c, hUGE_CH4_MASK
 	jp TickSubpattern
 
@@ -1761,7 +1755,7 @@ MACRO channel
 	.note: db
 	.subPattern: dw ; Pointer to the channel's subpattern.
 	.subPatternRow: db ; Which row the subpattern is currently in.
-	.ctrlMask: db ; The upper 2 bits written to NRx4.
+	.lengthBit: db ; The upper 2 bits written to NRx4.
 	IF (\1) != 4
 		; The current "period" (what gets written to NRx3/NRx4).
 		; This must be cached for effects like toneporta, which decouple this from the note.
