@@ -181,13 +181,15 @@ ELSE
 ENDC
 
 IF DEF(PREVIEW_MODE)
-	inc hl ; The tracker writes the starting order instead.
+	; The tracker writes the starting order, but does so in hD format, so we need to convert.
 	assert wOrderIdx == current_order
+	ld a, [hl]
+	sub 2
 ELSE
-	; Orders begin at 0.
-	xor a
-	ld [hli], a
+	; Begin at order 0, but `wForceRow` will cause it to increase.
+	ld a, -2
 ENDC
+	ld [hli], a
 	assert wOrderIdx + 1 == wPatternIdx
 	inc hl ; No need to init that, it will be set from `wForceRow`.
 	assert wPatternIdx + 1 == wForceRow
