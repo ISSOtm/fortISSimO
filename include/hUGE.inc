@@ -32,12 +32,15 @@ MACRO dn
     ELIF FX == FX_VOL_SLIDE
     ELIF FX == FX_POS_JUMP
         ; This is 1-based in the tracker. Converting to `orderIdx` format requires subtracting 1.
+        def FX_ARG -= 1
         ; In addition, this sets `wForceRow`, which causes the order index to be advanced; compensate for that as well.
-        def FX_ARG = (FX_ARG - 1 - 1) * 2
+        def FX_ARG -= 1
+        ; Convert to "order index" format.
+        def FX_ARG *= 2
     ELIF FX == FX_SET_VOLUME
         def FX_ARG = LOW(FX_ARG << 4) | FX_ARG >> 4 ; Swap the two nibbles to match NRx2 format.
         IF FX_ARG & $0F != 0 && FX_ARG & $F8 == 0
-            ; We will kill the channel! Let's mute it but avoid that.
+            ; We would kill the channel! Let's mute it but avoid that.
             def FX_ARG = $08 ; Set the volume to 0, but keep the channel alive to avoid a pop.
         ENDC
     ELIF FX == FX_PATTERN_BRK
