@@ -172,16 +172,13 @@ hUGE_StartSong::
 	dec c
 	jr nz, .copyPointers
 
+	assert wWaves + 2 == wOrderIdx
 IF DEF(PREVIEW_MODE)
-	assert wWaves + 2 == loop_order
-	inc hl
-	assert loop_order + 1 == wOrderIdx
 	; The tracker writes the starting order, but `wForceRow` will cause it to increase.
 	assert wOrderIdx == current_order
 	ld a, [hl]
 	sub 2
 ELSE
-	assert wWaves + 2 == wOrderIdx
 	; Begin at order 0, but `wForceRow` will cause it to increase.
 	ld a, -2
 ENDC
@@ -1735,7 +1732,6 @@ wWaves: dw
 ; Global variables.
 
 IF DEF(PREVIEW_MODE)
-loop_order: db ; If non-zero, instead of falling through to the next pattern, loop the current one.
 current_order:
 ENDC
 wOrderIdx: db ; Index into the orders, *in bytes*.
@@ -1866,6 +1862,7 @@ IF DEF(PREVIEW_MODE)
 	row: db
 	row_break: db
 	next_order: db
+	loop_order: db ; If non-zero, instead of falling through to the next pattern, loop the current one.
 ENDC
 
 
