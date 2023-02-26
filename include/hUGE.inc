@@ -41,6 +41,8 @@ MACRO dn
             def FX_ARG = $08 ; Set the volume to 0, but keep the channel alive to avoid a pop.
         ENDC
     ELIF FX == FX_PATTERN_BRK
+        assert FX_ARG != 0, "Pattern break is supposed to be 1-based!"
+        def FX_ARG -= 1
         assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
         def FX_ARG |= -PATTERN_LENGTH ; Convert to `forceRow` format.
     ELIF FX == FX_NOTE_CUT
