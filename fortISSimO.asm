@@ -174,18 +174,14 @@ hUGE_StartSong::
 
 IF DEF(PREVIEW_MODE)
 	assert wWaves + 2 == loop_order
-	inc hl ; TODO: does `loopPatterns` need to be init'd?
+	inc hl
 	assert loop_order + 1 == wOrderIdx
-ELSE
-	assert wWaves + 2 == wOrderIdx
-ENDC
-
-IF DEF(PREVIEW_MODE)
-	; The tracker writes the starting order, but does so in hD format, so we need to convert.
+	; The tracker writes the starting order, but `wForceRow` will cause it to increase.
 	assert wOrderIdx == current_order
 	ld a, [hl]
 	sub 2
 ELSE
+	assert wWaves + 2 == wOrderIdx
 	; Begin at order 0, but `wForceRow` will cause it to increase.
 	ld a, -2
 ENDC
@@ -298,10 +294,12 @@ hUGE_TickSound::
 .forceRow
 	ld [hl], a
 IF DEF(PREVIEW_MODE)
+	jr nz, .incRequired ; Everything that sets `wForceRow` expects the order to advance.
 	; If looping is enabled, don't switch patterns.
 	ld a, [loop_order]
 	and a
 	jr nz, .samePattern
+.incRequired
 ENDC
 	; Switch to next patterns.
 	dec hl
