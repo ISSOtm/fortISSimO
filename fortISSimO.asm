@@ -1823,6 +1823,17 @@ IF DEF(PREVIEW_MODE)
 		jp hUGE_StartSong
 
 	hUGE_dosound::
+		; Check if the tracker requested a change of orders.
+		ld a, [next_order]
+		and a
+		jr z, .noOrderChange
+		dec a
+		add a, a
+		ld [wOrderIdx], a
+		xor a
+		ld [next_order], a
+	.noOrderChange
+
 		; Check if the tracker requested a row break.
 		ld a, [row_break]
 		and a
@@ -1840,16 +1851,6 @@ IF DEF(PREVIEW_MODE)
 		xor a
 		ld [row_break], a
 	.noBreak
-
-		ld a, [next_order]
-		and a
-		jr z, .noOrderChange
-		dec a
-		add a, a
-		ld [wOrderIdx], a
-		xor a
-		ld [next_order], a
-	.noOrderChange
 
 		call hUGE_TickSound
 		db $f4 ; Signal tracker to take a snapshot of audio regs (for VGM export).
