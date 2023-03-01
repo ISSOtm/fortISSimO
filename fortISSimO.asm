@@ -472,7 +472,7 @@ TickSubpattern:
 	ld d, a
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	push bc ; Preserve the channel mask.
-	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
+	ld a, c ; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
 	add a, c ; 11, 15, 19
 	cp LOW(rNR23)
@@ -481,6 +481,7 @@ TickSubpattern:
 	; Write the period, together with the length bit.
 	ld a, [de]
 	ldh [c], a
+	inc de
 	inc c
 	ld a, [de]
 	or b ; Add the length bit.
