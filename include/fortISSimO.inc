@@ -10,11 +10,15 @@ MACRO dn
     ; for debuggability purposes.
     ; However, some transformations can be made at compile time, which simplifies the driver, makes
     ; it faster, and most importantly, "loosens" the `jr` tangle hell that is the FX code.
-    DEF NOTE = (\1)
-    DEF STEAL_FLAG = ((\2) & $10) << 3 ; Used by subpatterns only.
+    IF STRIN("+-", STRSUB("\1", 1, 1)) == 0
+        DEF NOTE = (\1) ; Regular pattern
+    ELSE
+        DEF NOTE = ((LAST_NOTE / 2) \1) ; Subpattern
+    ENDC
+    DEF STEAL_FLAG = ((\2) & $10) >> 4 ; Used by subpatterns only.
     DEF INSTR = (\2) & $0F
-    DEF FX = HIGH(\3)
-    DEF FX_ARG = LOW(\3)
+    DEF FX = ($\3)
+    DEF FX_ARG = ($\4)
 
     ; Some FX-specific transformations.
     ; TODO: at least do some `assert`s where relevant
@@ -55,7 +59,7 @@ MACRO dn
     ENDC
 
     ; And finally, the raw binary data.
-    db NOTE | STEAL_FLAG, INSTR << 4 | FX, FX_ARG
+    db NOTE | STEAL_FLAG << 7, INSTR << 4 | FX, FX_ARG
 ENDM
 
 rsreset

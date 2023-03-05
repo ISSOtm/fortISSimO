@@ -43,8 +43,8 @@ IF !DEF(FORTISSIMO_RAM)
 ENDC
 
 
-INCLUDE "include/hardware.inc" ; Bread & butter: check.
-INCLUDE "include/hUGE.inc" ; Get the note constants.
+INCLUDE "hardware.inc" ; Bread & butter: check.
+INCLUDE "fortISSimO.inc" ; Get the note constants.
 
 	rev_Check_hardware_inc 4.2
 
@@ -123,41 +123,8 @@ hUGE_StartSong::
 	assert wTicksPerRow + 1 == wLastPatternIdx
 	; TODO: pointing to a single byte is a bit silly
 	ld a, [de]
-	ld c, a
-	inc de
-	ld a, [de]
-	ld b, a
-	inc de
-	ld a, [bc]
-	; TODO: have tracker do this
-	sub 2
 	ld [hli], a
-
-	; TODO: change the order around to make loading this more efficient
-	ld a, [de]
-	ld [wCH1.order], a
-	inc de
-	ld a, [de]
-	ld [wCH1.order + 1], a
-	inc de
-	ld a, [de]
-	ld [wCH2.order], a
-	inc de
-	ld a, [de]
-	ld [wCH2.order + 1], a
-	inc de
-	ld a, [de]
-	ld [wCH3.order], a
-	inc de
-	ld a, [de]
-	ld [wCH3.order + 1], a
-	inc de
-	ld a, [de]
-	ld [wCH4.order], a
-	inc de
-	ld a, [de]
-	ld [wCH4.order + 1], a
-	; No `inc de` because the loop pre-increments
+	; No `inc de` because the loops pre-increment. (This saves one byte + cycle.)
 
 	assert wLastPatternIdx + 1 == wDutyInstrs
 	assert wDutyInstrs + 2 == wWaveInstrs
@@ -199,10 +166,14 @@ ENDC
 	assert wForceRow + 1 == wCH1
 	ld c, 4
 .initChannel
-	assert wCH1 == wCH1.order ; The order pointer was already written above
-	inc hl ; Skip order pointer.
-	inc hl
-	; All of these don't need to be init'd.
+	assert wCH1 == wCH1.order
+	; Copy the order pointer.
+	inc de
+	ld a, [de]
+	ld [hli], a
+	inc de
+	ld a, [de]
+	ld [hli], a
 	assert wCH1.order + 2 == wCH1.fxParams
 	inc hl ; Skip FX params.
 	assert wCH1.fxParams + 1 == wCH1.instrAndFX
@@ -427,10 +398,8 @@ TickSubpattern:
 	ld a, [hld] ; Read the length bit.
 	ld b, a
 	assert wCH1.lengthBit - 1 == wCH1.subPatternRow
-	ld a, [hl]
+	ld a, [hld]
 	ld e, a
-	add a, 3 ; Switch to next row.
-	ld [hld], a
 	assert wCH1.subPatternRow - 2 == wCH1.subPattern ; 16-bit variable.
 	; Add the row offset to the subpattern base pointer.
 	ld a, [hld]
@@ -453,7 +422,7 @@ TickSubpattern:
 	jr z, .noNoteOffset
 	; Apply the note offset, if any.
 	ld a, [hl]
-	res 7, a ; That's the fifth "jump" bit, see further below.
+	res 7, a ; That's the fifth "jump" bit, see further below. TOOD: consider moving it to bit 0
 	assert LAST_NOTE <= 128 ; Otherwise the above clears an important bit.
 	cp LAST_NOTE
 	jr nc, .noNoteOffset
@@ -501,10 +470,8 @@ TickSubpattern:
 	and 1
 	xor b
 	and $F1 ; Discard the remaining 3 bits.
-	jr z, .noJump
 	swap a ; The instrument bits (low 4) are in bits 4–7, and the fifth bit is in bit 0, so swap the nibbles.
-	dec a ; Rows are 0-based.
-	push hl ; TODO: belch.
+	push hl ; TODO: belch. Storing the offset non-tripled and using `de` instead would allow cutting the stack ops.
 	; Rows are 3 bytes each.
 	ld l, a
 	add a, a
@@ -514,7 +481,6 @@ TickSubpattern:
 	add hl, de
 	ld [hl], a
 	pop hl
-.noJump
 
 	; Play the row's FX.
 	ld a, b ; Read the FX/instr byte again.
@@ -599,11 +565,11 @@ ReadRow:
 	dec de
 	assert wCH1.instrAndFX + 1 == wCH1.note
 	ld a, [de]
+	runtime_assert ReadRow, a < {d:LAST_NOTE} || a == {d:___}, "Invalid note ID \{a,#\}"
 	ld d, a
 	; If the row is a rest, don't play it.
 	cp ___
 	ret z
-	runtime_assert ReadRow, a < {d:LAST_NOTE}, "Invalid note ID \{a,#\}"
 	ld [hli], a ; Only write the note back if it's not a rest.
 	; If the FX is a tone porta or a note delay, don't play the note yet.
 	ld a, c
@@ -1701,7 +1667,7 @@ ContinueFx: ; TODO: if this is short enough, swapping it with the other path may
 
 
 PeriodTable:
-	INCLUDE "include/hUGE_note_table.inc"
+	INCLUDE "hUGE_note_table.inc"
 
 
 PUSHS

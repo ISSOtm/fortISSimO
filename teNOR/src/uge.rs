@@ -13,8 +13,8 @@ use nom::{
 };
 
 use crate::song::{
-    Cell, InstrCollection, Instrument, InstrumentBank, InstrumentKind, Pattern, Routine,
-    RoutineBank, Song, Wave, WaveBank,
+    EffectId, InstrCollection, Instrument, InstrumentBank, InstrumentKind, Pattern, Routine,
+    RoutineBank, Song, Subpattern, Wave, WaveBank,
 };
 
 type PResult<'input, O> = IResult<&'input [u8], O, InnerError<'input>>;
@@ -155,7 +155,7 @@ fn instrument_v3(input: &[u8]) -> PResult<Instrument<'_>> {
         let (input, waveform) = try_convert(input, nom::number::complete::le_u32)?;
         let (input, lfsr_width) = try_convert(input, nom::number::complete::le_u32)?;
         let (input, subpattern_enabled) = boolean(input)?;
-        let (input, subpattern) = pattern_v2(input)?;
+        let (input, subpattern) = subpattern_v2(input)?;
 
         Ok((
             input,
@@ -264,24 +264,68 @@ fn pattern_map_entry_v2(input: &[u8]) -> PResult<(usize, Pattern)> {
 fn pattern_v2(input: &[u8]) -> PResult<Pattern> {
     fn inner(input: &[u8]) -> PResult<Pattern> {
         let mut pattern = [Default::default(); 64];
-        let (input, ()) = fill(cell_v2, &mut pattern)(input)?;
+        let (input, ()) = fill(|input| try_convert(input, cell_v2), &mut pattern)(input)?;
         Ok((input, pattern))
     }
     context("parsing v2 pattern from here", inner)(input)
 }
 
-fn cell_v2(input: &[u8]) -> PResult<Cell> {
-    fn inner(input: &[u8]) -> PResult<Cell> {
+fn subpattern_v2(input: &[u8]) -> PResult<Subpattern> {
+    fn inner(input: &[u8]) -> PResult<Subpattern> {
+        let mut pattern: Subpattern = [Default::default(); 32];
+        let (mut input, ()) = fill(|input| try_convert(input, cell_v2), &mut pattern)(input)?;
+        // The remainder of the pattern is encoded, but not used.
+        for _ in 32..64 {
+            (input, _) = cell_v2(input)?;
+        }
+        // Adjust the jump targets. There is actually a reason for doing this!
+        //
+        // hUGETracker encodes them as "0 for no jump, otherwise the target column, 1-indexed".
+        // However, there are only 5 bits to encode this information, which introduces a subtle bug:
+        // 32 needs 6 bits to be encoded!
+        // hUGETracker's export emits "32" verbatim, and hUGEDriver's `dn` macro silently truncates
+        // that to 0, meaning "no jump".
+        // We fix this by making each row *unconditionally* jump! The 32 row IDs fit in 5 bits.
+        for (i, cell) in pattern.iter_mut().enumerate() {
+            cell.next_row_idx = match cell.next_row_idx {
+                0 => i as u8 + 1, // i is in 0..32
+                n => n - 1,
+            };
+        }
+        Ok((input, pattern))
+    }
+    context("parsing v2 (sub)pattern from here", inner)(input)
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct RawCell {
+    /// Actually a note offset in subpatterns, so this is not a `Note`.
+    note: u8,
+    /// Unused in subpatterns.
+    instrument: u8,
+    /// For subpatterns only.
+    jump_index: u8,
+    effect_code: EffectId,
+    effect_params: u8,
+}
+
+fn cell_v2(input: &[u8]) -> PResult<RawCell> {
+    fn inner(input: &[u8]) -> PResult<RawCell> {
         let (input, note) = try_convert(input, integer)?;
         let (input, instrument) = try_convert(input, integer)?;
-        let (input, _volume) = integer(input)?;
+        let (input, jump_index) = try_convert(input, integer)?;
         let (input, effect_code) = try_convert(input, integer)?;
         let (input, effect_params) = nom::number::complete::u8(input)?;
 
-        assert_eq!(_volume, 0);
         Ok((
             input,
-            Cell::new(note, instrument, effect_code, effect_params),
+            RawCell {
+                note,
+                instrument,
+                jump_index,
+                effect_code,
+                effect_params,
+            },
         ))
     }
     context("parsing v2 cell from here", inner)(input)
@@ -289,8 +333,8 @@ fn cell_v2(input: &[u8]) -> PResult<Cell> {
 
 // Order.
 
-fn order_matrix(input: &[u8]) -> PResult<Vec<[u8; 4]>> {
-    fn inner(input: &[u8]) -> PResult<Vec<[u8; 4]>> {
+fn order_matrix(input: &[u8]) -> PResult<Vec<[usize; 4]>> {
+    fn inner(input: &[u8]) -> PResult<Vec<[usize; 4]>> {
         let mut orders = std::array::from_fn(|_| Default::default());
         let (input, ()) = fill(order_column, &mut orders)(input)?;
 
@@ -311,7 +355,7 @@ fn order_matrix(input: &[u8]) -> PResult<Vec<[u8; 4]>> {
     context("parsing order matrix from here", inner)(input)
 }
 
-fn order_column(input: &[u8]) -> PResult<Vec<u8>> {
+fn order_column(input: &[u8]) -> PResult<Vec<usize>> {
     context(
         "parsing order \"column\" from here",
         length_count(integer, |input| try_convert(input, integer)),
@@ -405,6 +449,8 @@ enum InnerErrorKind {
     BadDutyType(u8),
     BadWaveOutLevel(u32),
     BadLfsrWidth(u32),
+    BadNote(u32),
+    BadEffectId(u32),
     BadWave(u8),
     OrderNotMatrix(usize, usize, usize, usize),
     NumOutOfRange(TryFromIntError),
@@ -422,6 +468,8 @@ impl Display for InnerErrorKind {
             Self::BadDutyType(n) => write!(f, "Duty type out of range (0x{n:08x})"),
             Self::BadWaveOutLevel(n) => write!(f, "Wave output level out of range (0x{n:08x})"),
             Self::BadLfsrWidth(n) => write!(f, "LFSR width out of range (0x{n:08x})"),
+            Self::BadNote(n) => write!(f, "Note out of range (0x{n:08x})"),
+            Self::BadEffectId(n) => write!(f, "Effect ID out of range (0x{n:08x})"),
             Self::BadWave(raw) => write!(f, "Wave sample out of range (0x{raw:02x})"),
             Self::OrderNotMatrix(ch1, ch2, ch3, ch4) => write!(
                 f,
@@ -531,6 +579,144 @@ impl TryConstrain<crate::song::LfsrWidth> for u32 {
             0 => Ok(Fifteen),
             1 => Ok(Seven),
             n => Err(InnerErrorKind::BadLfsrWidth(n)),
+        }
+    }
+}
+
+impl TryConstrain<crate::song::PatternCell> for RawCell {
+    fn try_constrain(self) -> Result<crate::song::PatternCell, InnerErrorKind> {
+        let note = u32::from(self.note).try_constrain()?;
+        let instrument = self.instrument;
+        let effect_code = self.effect_code;
+        let effect_param = self.effect_params;
+        Ok(crate::song::PatternCell {
+            note,
+            instrument,
+            effect_code,
+            effect_param,
+        })
+    }
+}
+
+impl TryConstrain<crate::song::SubpatternCell> for RawCell {
+    fn try_constrain(self) -> Result<crate::song::SubpatternCell, InnerErrorKind> {
+        let offset = self.note;
+        let next_row_idx = self.jump_index;
+        let effect_code = self.effect_code;
+        let effect_param = self.effect_params;
+        Ok(crate::song::SubpatternCell {
+            offset,
+            next_row_idx,
+            effect_code,
+            effect_param,
+        })
+    }
+}
+
+impl TryConstrain<crate::song::EffectId> for u32 {
+    fn try_constrain(self) -> Result<crate::song::EffectId, InnerErrorKind> {
+        match self {
+            0x0 => Ok(EffectId::Arpeggio),
+            0x1 => Ok(EffectId::PortaUp),
+            0x2 => Ok(EffectId::PortaDown),
+            0x3 => Ok(EffectId::TonePorta),
+            0x4 => Ok(EffectId::Vibrato),
+            0x5 => Ok(EffectId::SetMasterVol),
+            0x6 => Ok(EffectId::CallRoutine),
+            0x7 => Ok(EffectId::NoteDelay),
+            0x8 => Ok(EffectId::SetPanning),
+            0x9 => Ok(EffectId::ChangeTimbre),
+            0xa => Ok(EffectId::VolSlide),
+            0xb => Ok(EffectId::PosJump),
+            0xc => Ok(EffectId::SetVol),
+            0xd => Ok(EffectId::PatternBreak),
+            0xe => Ok(EffectId::NoteCut),
+            0xf => Ok(EffectId::SetTempo),
+            n => Err(InnerErrorKind::BadEffectId(n)),
+        }
+    }
+}
+
+impl TryConstrain<crate::song::Note> for u32 {
+    fn try_constrain(self) -> Result<crate::song::Note, InnerErrorKind> {
+        use crate::song::Note::*;
+
+        match self {
+            00 => Ok(C_3),
+            01 => Ok(CSharp3),
+            02 => Ok(D_3),
+            03 => Ok(DSharp3),
+            04 => Ok(E_3),
+            05 => Ok(F_3),
+            06 => Ok(FSharp3),
+            07 => Ok(G_3),
+            08 => Ok(GSharp3),
+            09 => Ok(A_3),
+            10 => Ok(ASharp3),
+            11 => Ok(B_3),
+            12 => Ok(C_4),
+            13 => Ok(CSharp4),
+            14 => Ok(D_4),
+            15 => Ok(DSharp4),
+            16 => Ok(E_4),
+            17 => Ok(F_4),
+            18 => Ok(FSharp4),
+            19 => Ok(G_4),
+            20 => Ok(GSharp4),
+            21 => Ok(A_4),
+            22 => Ok(ASharp4),
+            23 => Ok(B_4),
+            24 => Ok(C_5),
+            25 => Ok(CSharp5),
+            26 => Ok(D_5),
+            27 => Ok(DSharp5),
+            28 => Ok(E_5),
+            29 => Ok(F_5),
+            30 => Ok(FSharp5),
+            31 => Ok(G_5),
+            32 => Ok(GSharp5),
+            33 => Ok(A_5),
+            34 => Ok(ASharp5),
+            35 => Ok(B_5),
+            36 => Ok(C_6),
+            37 => Ok(CSharp6),
+            38 => Ok(D_6),
+            39 => Ok(DSharp6),
+            40 => Ok(E_6),
+            41 => Ok(F_6),
+            42 => Ok(FSharp6),
+            43 => Ok(G_6),
+            44 => Ok(GSharp6),
+            45 => Ok(A_6),
+            46 => Ok(ASharp6),
+            47 => Ok(B_6),
+            48 => Ok(C_7),
+            49 => Ok(CSharp7),
+            50 => Ok(D_7),
+            51 => Ok(DSharp7),
+            52 => Ok(E_7),
+            53 => Ok(F_7),
+            54 => Ok(FSharp7),
+            55 => Ok(G_7),
+            56 => Ok(GSharp7),
+            57 => Ok(A_7),
+            58 => Ok(ASharp7),
+            59 => Ok(B_7),
+            60 => Ok(C_8),
+            61 => Ok(CSharp8),
+            62 => Ok(D_8),
+            63 => Ok(DSharp8),
+            64 => Ok(E_8),
+            65 => Ok(F_8),
+            66 => Ok(FSharp8),
+            67 => Ok(G_8),
+            68 => Ok(GSharp8),
+            69 => Ok(A_8),
+            70 => Ok(ASharp8),
+            71 => Ok(B_8),
+            90 => Ok(None),
+
+            n => Err(InnerErrorKind::BadNote(n)),
         }
     }
 }
