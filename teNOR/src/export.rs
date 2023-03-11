@@ -301,13 +301,13 @@ impl Display for CellFirstHalf {
             Self::Subpattern {
                 offset: 90,
                 next_row_idx,
-            } => write!(f, "___, {next_row_idx:>2}"),
+            } => write!(f, "sub, ___, {next_row_idx:>2}"),
             Self::Subpattern {
                 offset,
                 next_row_idx,
             } => write!(
                 f,
-                "{:>+3}, {next_row_idx:>2}",
+                "sub, {:>+3}, {next_row_idx:>2}",
                 offset.wrapping_sub(LAST_NOTE / 2) as i8,
             ),
         }

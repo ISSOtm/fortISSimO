@@ -12,6 +12,7 @@ For documentation and example of usage, see [fortISSimO-demo](https://github.com
 This driver can be used as a drop-in replacement of [SuperDisk's GB sound driver][hUGEDriver].
 It has, however, a few differences:
 
+- **fortISSimO requires [a custom export program](https://github.com/ISSOtm/fortISSimO/tree/master/teNOR)**, due to using a tweaked music format under the hood.
 - This driver should perform a bit faster than hUGEDriver, and be somewhat smaller.
 - Vibrato is **not** supported at all in subpatterns!
   Please use `1xx` and `2xx` instead.
@@ -20,7 +21,7 @@ It has, however, a few differences:
 
 ### Routines
 
-<details><summary>fortISSimO uses a different approach to routines than hUGEDriver.</summary>
+<details><summary>fortISSimO uses a different approach to routines than hUGEDriver. Click to expand.</summary>
 
 Namely, fortISSimO only supports a *single* routine per song!
 It is, however, passed the full argument, so it can perform dispatch on its own.

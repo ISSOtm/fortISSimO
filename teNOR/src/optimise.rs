@@ -307,7 +307,10 @@ impl PartialEq for CellFirstHalf {
                 CellFirstHalf::Subpattern {
                     offset,
                     next_row_idx,
-                } => (offset | (next_row_idx & 0x10) << 4, next_row_idx & 0x0F),
+                } => (
+                    offset << 1 | (next_row_idx & 0x10) >> 4,
+                    next_row_idx & 0x0F,
+                ),
             }
         }
 

@@ -398,7 +398,13 @@ TickSubpattern:
 	ld a, [hld] ; Read the length bit.
 	ld b, a
 	assert wCH1.lengthBit - 1 == wCH1.subPatternRow
+	runtime_assert TickSubpattern, [@hl] < 32, "Subpattern row index out of bounds! (\{[@hl]\})"
 	ld a, [hld]
+	; One row is 3 bytes long.
+	ld e, a
+	inc a ; Plus two because we read rows backwards. TODO: have exporter emit rows inverted instead! (See similar TOOD further above)
+	add a, a
+	add a, e
 	ld e, a
 	assert wCH1.subPatternRow - 2 == wCH1.subPattern ; 16-bit variable.
 	; Add the row offset to the subpattern base pointer.
@@ -406,41 +412,65 @@ TickSubpattern:
 	ld d, a
 	or [hl]
 	ret z ; Return if subpattern pointer is NULL (no subpattern).
+
 	ld a, [hld]
 	assert wCH1.subPattern - 1 == wCH1.note
 	push hl ; Save pointer to current note.
 	add a, e
-	ld e, a ; Can't write directly to l, as we need to deref hl just below.
+	ld l, a
 	adc a, d
-	sub e
-	ld d, [hl] ; Cache the current base note. (Must be done here because d is used above.)
+	sub l
 	ld h, a
-	ld l, e
+	; Read the row's FX parameter.
+	ld a, [hld]
+	ldh [hUGE_FxParam], a
+	runtime_assert TickSubpattern, [(([@hl] & $0F) * 2 + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
+	ld a, [hld] ; Read the jump target and FX ID.
+	ld l, [hl] ; Read the note offset.
+	ld h, a ; We'll need to persist this for a bit.
+
+	; Update the index to point to the next row.
+	and $F0 ; Retain the jump target only.
+	; There is one extra bit (bit 4) in the note field, specifically its bit 0.
+	srl l ; Move the extra bit into carry, and put the note in place.
+	adc a, 0 ; Inject the extra bit into bit 0.
+	swap a ; Put the bits in their right place.
+	pop de ; This points to `wCHx.note`.
+	assert wCH1.subPatternRow - wCH1.note == 3
+	inc de
+	inc de
+	inc de
+	ld [de], a
+
+	; Apply the note offset, if any.
+	dec de ; Point back to the base note.
+	dec de
+	dec de
+	ld a, l
+	cp LAST_NOTE
+	jr nc, .noNoteOffset
 	; Check if the channel is muted; if so, don't write to NRxy.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	jr z, .noNoteOffset
-	; Apply the note offset, if any.
-	ld a, [hl]
-	res 7, a ; That's the fifth "jump" bit, see further below. TOOD: consider moving it to bit 0
-	assert LAST_NOTE <= 128 ; Otherwise the above clears an important bit.
-	cp LAST_NOTE
-	jr nc, .noNoteOffset
-	; Treat the "note" byte as an offset from the base note.
+	; Compute the note's ID.
+	ld a, [de]
+	add a, l
 	sub LAST_NOTE / 2 ; Go from "unsigned range" to "signed range".
-	add a, d ; Add base note (cached above).
 	bit 3, c
 	assert hUGE_CH4_MASK == 1 << 3
 	jr nz, .ch4
+	; For the FX dispatch below, we need the FX ID (in `h`) and the channel mask (in `c`).
+	ld l, c
+	push hl
 	; Compute the note's period.
 	add a, a
 	add a, LOW(PeriodTable)
-	ld e, a
+	ld l, a
 	adc a, HIGH(PeriodTable)
-	sub e
-	ld d, a
+	sub l
+	ld h, a
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
-	push bc ; Preserve the channel mask.
 	ld a, c ; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
 	add a, c ; 11, 15, 19
@@ -448,50 +478,27 @@ TickSubpattern:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Write the period, together with the length bit.
-	ld a, [de]
+	ld a, [hli]
 	ldh [c], a
-	inc de
 	inc c
-	ld a, [de]
+	ld a, [hl]
 	or b ; Add the length bit.
 	ldh [c], a
-	pop bc ; Retrieve the channel mask.
-.noNoteOffset
-
-	pop de ; Retrieve pointer to note byte.
-	; The "instrument" bits are repurposed as a "jump target" instead (to avoid taking up the FX slot).
-	; However, a fifth bit is required to address all 32 rows, and that's the note's 7th bit.
-	ld a, [hli]
-	rlca ; Shift bit 7 into bit 0
-	runtime_assert TickSubpattern, [(([hl] & $0F) * 2 + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
-	ld b, [hl] ; Read the row's FX byte.
-	inc hl
-	xor b
-	and 1
-	xor b
-	and $F1 ; Discard the remaining 3 bits.
-	swap a ; The instrument bits (low 4) are in bits 4–7, and the fifth bit is in bit 0, so swap the nibbles.
-	push hl ; TODO: belch. Storing the offset non-tripled and using `de` instead would allow cutting the stack ops.
-	; Rows are 3 bytes each.
-	ld l, a
-	add a, a
-	add a, l
-	; Jump to the selected row.
-	ld hl, wCH1.subPatternRow - wCH1.note
-	add hl, de
-	ld [hl], a
-	pop hl
+	pop bc ; Retore the FX ID and the channel mask.
+.appliedOffset
 
 	; Play the row's FX.
 	ld a, b ; Read the FX/instr byte again.
 	and $0F ; Keep the FX bits only.
-	ld b, [hl] ; Read the row's FX params.
 	add a, a
 	add a, LOW(.fxPointers)
 	ld l, a
 	adc a, HIGH(.fxPointers)
 	sub l
 	ld h, a
+	; Retrieve the FX param.
+	ldh a, [hUGE_FxParam]
+	ld b, a
 	; Deref the pointer, and jump to it.
 	ld a, [hli]
 	ld h, [hl]
@@ -506,7 +513,9 @@ TickSubpattern:
 	ldh [rNR43], a
 	ld a, b
 	ldh [rNR44], a
-	jr .noNoteOffset
+.noNoteOffset
+	ld b, h ; Transfer the FX ID for the calling code.
+	jr .appliedOffset
 
 .fxPointers
 	dw FxArpeggio
@@ -1754,7 +1763,9 @@ SECTION "Music driver HRAM", HRAM
 
 ; `hUGE_AllowedChannels` is accessed directly a *lot* in FX code, and the 1-byte save from `ldh`
 ; helps keeping all the code in `jr` range.
+; hUGE_FxParams allows reducing register pressure in TickSubpattern.
 
+hUGE_FxParam: db ; Temporary variable in TickSubpattern.
 
 ; As soon as a channel's bit gets set in this variable, the driver will stop updating any of its registers.
 ; This is useful, for example, for playing sound effects: temporarily "mute" one of the song's channels,
