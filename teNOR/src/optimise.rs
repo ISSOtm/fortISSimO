@@ -9,11 +9,8 @@ pub fn optimise<'song>(song: &'song Song) -> (Vec<OutputCell>, OptimStats) {
         mark_reachable_subpattern_rows(subpattern);
     }
 
-    // TODO: eliminating trailing unreachable rows from patterns; this can also be combined with
-    //       the step below.
-
-    // TODO: eliminating "dead" patterns, i.e. those with no reachable rows (which is not possible
-    //       for subpatterns), would reduce pressure on every following step.
+    let (pruned_patterns, pruned_pattern_rows, trimmed_rows) =
+        eliminate_trailing_unreachable_rows(&mut patterns);
 
     // TODO: eliminate "dead" instruments
 
@@ -24,17 +21,48 @@ pub fn optimise<'song>(song: &'song Song) -> (Vec<OutputCell>, OptimStats) {
 
     // TODO: pattern deduplication (including finding patterns "in the middle of" of others) would
     //       cut down on the number of patterns, and potentially speed up following steps.
-    let (pattern_ordering, nb_overlapped_rows) = find_pattern_overlap(&patterns);
+    let (pattern_ordering, overlapped_rows) = find_pattern_overlap(&patterns);
     let cell_pool = generate_cell_pool(&patterns, &pattern_ordering);
 
     // TODO: instrument list truncation
 
-    (cell_pool, OptimStats { nb_overlapped_rows })
+    (
+        cell_pool,
+        OptimStats {
+            overlapped_rows,
+            pruned_patterns,
+            pruned_pattern_rows,
+            trimmed_rows,
+        },
+    )
 }
 
 #[derive(Debug, Clone)]
 pub struct OptimStats {
-    pub nb_overlapped_rows: usize,
+    pub overlapped_rows: usize,
+    pub pruned_patterns: usize,
+    pub pruned_pattern_rows: usize,
+    pub trimmed_rows: usize,
+}
+
+impl OptimStats {
+    pub fn saved_bytes_overlapped_rows(&self) -> usize {
+        self.overlapped_rows * 3
+    }
+
+    pub fn saved_bytes_pruned_patterns(&self) -> usize {
+        self.pruned_pattern_rows * 3
+    }
+
+    pub fn saved_bytes_trimmed_rows(&self) -> usize {
+        self.trimmed_rows * 3
+    }
+
+    pub fn total_saved_bytes(&self) -> usize {
+        self.saved_bytes_overlapped_rows()
+            + self.saved_bytes_pruned_patterns()
+            + self.saved_bytes_trimmed_rows()
+    }
 }
 
 fn collect_patterns(song: &Song) -> Vec<OptimisedPattern> {
@@ -179,6 +207,34 @@ fn mark_reachable_subpattern_rows(subpattern: &mut OptimisedPattern) {
     }
 }
 
+fn eliminate_trailing_unreachable_rows(
+    patterns: &mut Vec<OptimisedPattern>,
+) -> (usize, usize, usize) {
+    let mut i = 0;
+    let mut pruned_patterns = 0;
+    let mut pruned_pattern_rows = 0;
+    let mut trimmed_rows = 0;
+
+    while i < patterns.len() {
+        let pattern = &mut patterns[i].cells;
+        match pattern.iter().enumerate().rev().find(|(_, cell)| cell.0) {
+            Some((last_used_idx, _)) => {
+                trimmed_rows += pattern.len() - last_used_idx;
+                pattern.truncate(last_used_idx + 1);
+                i += 1; // Switch to the next pattern.
+            }
+            None => {
+                pruned_patterns += 1;
+                pruned_pattern_rows += pattern.len();
+                patterns.remove(i);
+                // The next element is now at index `i`.
+            }
+        }
+    }
+
+    (pruned_patterns, pruned_pattern_rows, trimmed_rows)
+}
+
 // This algorithm is described in the README.
 fn find_pattern_overlap(patterns: &[OptimisedPattern]) -> (Vec<(usize, usize)>, usize) {
     let nb_patterns = patterns.len();
@@ -264,16 +320,16 @@ fn generate_cell_pool(
 ) -> Vec<OutputCell> {
     let mut rows = Vec::new();
 
-    for (pattern_id, nb_overlapped_rows) in pattern_ordering.iter().cloned() {
+    for (pattern_id, overlapped_rows) in pattern_ordering.iter().cloned() {
         let pattern = &patterns[pattern_id];
         rows.push(OutputCell::Label(pattern.id));
         rows.extend(
-            pattern.cells[..pattern.cells.len() - nb_overlapped_rows]
+            pattern.cells[..pattern.cells.len() - overlapped_rows]
                 .iter()
                 .map(|cell| OutputCell::Cell(cell.1)),
         );
-        if nb_overlapped_rows != 0 {
-            rows.push(OutputCell::OverlapMarker(nb_overlapped_rows));
+        if overlapped_rows != 0 {
+            rows.push(OutputCell::OverlapMarker(overlapped_rows));
         }
     }
 

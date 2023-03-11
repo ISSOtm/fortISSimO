@@ -1,6 +1,7 @@
-use std::{ffi::OsString, path::Path, process::exit};
+use std::{ffi::OsString, fmt::Display, io::Write, path::Path, process::exit};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 
 mod export;
 mod optimise;
@@ -41,17 +42,52 @@ struct CliArgs {
     /// Do not emit stats at the end.
     #[arg(short = 'q', long)]
     quiet: bool,
+
+    /// Use colours when writing to standard error (errors, stats, etc.)
+    #[arg(long, default_value_t)]
+    color: CliColorChoice,
 }
 
 fn main() {
     let args = CliArgs::parse();
+    let color_choice = match args.color {
+        CliColorChoice::Always => termcolor::ColorChoice::Always,
+        CliColorChoice::Auto if atty::is(atty::Stream::Stderr) => termcolor::ColorChoice::Auto,
+        CliColorChoice::Auto => termcolor::ColorChoice::Never,
+        CliColorChoice::Never => termcolor::ColorChoice::Never,
+    };
+    let stderr = StandardStream::stderr(color_choice);
+    let mut stderr = stderr.lock();
     let input_path: &Path = args.input_path.as_ref();
 
-    let data = std::fs::read(&input_path).expect("Failed to read UGE file"); // TODO
+    macro_rules! write_error {
+        ($descr:literal $(, $($descr_args:expr),+)? ; $(,)? $inner:literal $(, $($inner_args:expr),+)? $(,)?) => {
+            stderr
+                .set_color(ColorSpec::new().set_bold(true).set_fg(Some(Color::Red)))
+                .unwrap();
+            write!(stderr, "Error: ").unwrap();
+            stderr
+                .set_color(ColorSpec::new().set_bold(true).set_fg(None))
+                .unwrap();
+            write!(stderr, $descr $(, $($descr_args),+)?).unwrap();
+            stderr.set_color(ColorSpec::new().set_bold(false)).unwrap();
+            writeln!(stderr, $inner $(, $($inner_args),+)?).unwrap();
+        };
+    }
+
+    let data = match std::fs::read(&input_path) {
+        Ok(data) => data,
+        Err(err) => {
+            write_error!("Failed to read file \"{}\": ", input_path.display();
+                "{err}");
+            exit(1);
+        }
+    };
     let song = match uge::parse_song(&data) {
         Ok(song) => song,
         Err(err) => {
-            eprintln!("{err}");
+            write_error!("Unable to parse a UGE song from \"{}\": ", input_path.display();
+                "{err}");
             exit(1);
         }
     };
@@ -61,10 +97,61 @@ fn main() {
     export::export(&args, &song, input_path, &cell_pool);
 
     if !args.quiet {
-        eprintln!(
-            "{} overlapped rows save {} bytes",
-            optim_stats.nb_overlapped_rows,
-            optim_stats.nb_overlapped_rows * 3
+        stderr
+            .set_color(ColorSpec::new().set_underline(true))
+            .unwrap();
+        writeln!(stderr, "teNOR optimisation stats:").unwrap();
+        let mut report = |verb, how_many, what, bytes_saved| {
+            stderr.set_color(&ColorSpec::new()).unwrap();
+            write!(stderr, "\t{verb} {how_many} {what} saved ").unwrap();
+            stderr.set_color(ColorSpec::new().set_bold(true)).unwrap();
+            writeln!(stderr, "{bytes_saved} bytes").unwrap();
+        };
+        report(
+            "Pruning",
+            optim_stats.pruned_patterns,
+            "unreachable patterns",
+            optim_stats.saved_bytes_pruned_patterns(),
         );
+        report(
+            "Trimming",
+            optim_stats.trimmed_rows,
+            "unreachable rows",
+            optim_stats.saved_bytes_trimmed_rows(),
+        );
+        report(
+            "Overlapping",
+            optim_stats.overlapped_rows,
+            "rows",
+            optim_stats.saved_bytes_overlapped_rows(),
+        );
+        writeln!(
+            stderr,
+            "Total: {} bytes saved",
+            optim_stats.total_saved_bytes()
+        )
+        .unwrap();
+        stderr.set_color(&ColorSpec::new()).unwrap();
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+enum CliColorChoice {
+    /// Always use colours.
+    Always,
+    /// Use colours only if writing directly to a terminal.
+    #[default]
+    Auto,
+    /// Never use colours.
+    Never,
+}
+
+impl Display for CliColorChoice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Always => write!(f, "always"),
+            Self::Auto => write!(f, "auto"),
+            Self::Never => write!(f, "never"),
+        }
     }
 }
