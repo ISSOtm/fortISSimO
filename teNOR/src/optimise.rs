@@ -293,8 +293,8 @@ impl AnnotatedCell {
         //   be to check if the other overlapping rows are compatible, but that's a TODO.
         // Note that we only disable the RHS, because it is always the LHS' rows that get truncated;
         // and we wouldn't want unreachable rows to be emitted in stead of reachable rows.
-        !self.is_reachable() /* || !other.is_reachable() */ && other.is_reachable()
-            || self.1 == other.1
+        !self.is_reachable() /* || !other.is_reachable() */
+            || (other.is_reachable() && self.1 == other.1)
     }
 }
 
