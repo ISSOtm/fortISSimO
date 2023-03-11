@@ -288,7 +288,7 @@ fn subpattern_v2(input: &[u8]) -> PResult<Subpattern> {
         // We fix this by making each row *unconditionally* jump! The 32 row IDs fit in 5 bits.
         for (i, cell) in pattern.iter_mut().enumerate() {
             cell.next_row_idx = match cell.next_row_idx {
-                0 => i as u8 + 1, // i is in 0..32
+                0 => (i as u8 + 1) % 32, // i is in 0..32
                 n => n - 1,
             };
         }
@@ -313,7 +313,7 @@ fn cell_v2(input: &[u8]) -> PResult<RawCell> {
     fn inner(input: &[u8]) -> PResult<RawCell> {
         let (input, note) = try_convert(input, integer)?;
         let (input, instrument) = try_convert(input, integer)?;
-        let (input, jump_index) = try_convert(input, integer)?;
+        let (input, jump_index) = try_convert(input, integer)?; // TODO: bounds checking
         let (input, effect_code) = try_convert(input, integer)?;
         let (input, effect_params) = nom::number::complete::u8(input)?;
 
