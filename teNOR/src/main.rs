@@ -37,6 +37,10 @@ struct CliArgs {
     /// If omitted, this will be deduced from the input file name.
     #[arg(short = 'd', long)]
     song_descriptor: Option<String>,
+
+    /// Do not emit stats at the end.
+    #[arg(short = 'q', long)]
+    quiet: bool,
 }
 
 fn main() {
@@ -52,7 +56,15 @@ fn main() {
         }
     };
 
-    let cell_pool = optimise::optimise(&song);
+    let (cell_pool, optim_stats) = optimise::optimise(&song);
 
     export::export(&args, &song, input_path, &cell_pool);
+
+    if !args.quiet {
+        eprintln!(
+            "{} overlapped rows save {} bytes",
+            optim_stats.nb_overlapped_rows,
+            optim_stats.nb_overlapped_rows * 3
+        );
+    }
 }

@@ -1,6 +1,6 @@
 use crate::song::{EffectId, Instrument, Note, Pattern, Song, Subpattern};
 
-pub fn optimise<'song>(song: &'song Song) -> Vec<OutputCell> {
+pub fn optimise<'song>(song: &'song Song) -> (Vec<OutputCell>, OptimStats) {
     let mut patterns = collect_patterns(song);
     let (song_patterns, subpatterns) = patterns.split_at_mut(song.patterns.len());
 
@@ -24,20 +24,29 @@ pub fn optimise<'song>(song: &'song Song) -> Vec<OutputCell> {
 
     // TODO: pattern deduplication (including finding patterns "in the middle of" of others) would
     //       cut down on the number of patterns, and potentially speed up following steps.
-    let (pattern_ordering, score) = find_pattern_overlap(&patterns);
-    eprintln!("Managed to overlap {score} rows!");
+    let (pattern_ordering, nb_overlapped_rows) = find_pattern_overlap(&patterns);
     let cell_pool = generate_cell_pool(&patterns, &pattern_ordering);
 
     // TODO: instrument list truncation
 
-    cell_pool
+    (cell_pool, OptimStats { nb_overlapped_rows })
+}
+
+#[derive(Debug, Clone)]
+pub struct OptimStats {
+    pub nb_overlapped_rows: usize,
 }
 
 fn collect_patterns(song: &Song) -> Vec<OptimisedPattern> {
     let mut patterns = Vec::with_capacity(song.patterns.len() + song.instruments.len());
 
     // First, let's collect all patterns.
-    patterns.extend(song.patterns.iter().enumerate().map(Into::into));
+    patterns.extend(
+        song.patterns
+            .iter()
+            .enumerate()
+            .map(|pattern| pattern.into()),
+    );
     let mut collect_subpatterns = |instruments: &[Instrument], kind| {
         patterns.extend(instruments.iter().enumerate().filter_map(|(i, instr)| {
             instr
