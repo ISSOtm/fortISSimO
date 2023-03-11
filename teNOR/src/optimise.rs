@@ -1,6 +1,6 @@
 use crate::song::{EffectId, Instrument, Note, Pattern, Song, Subpattern};
 
-pub fn optimise<'song>(song: &'song Song) -> (Vec<OutputCell>, OptimStats) {
+pub fn optimise(song: &Song) -> (Vec<OutputCell>, OptimStats) {
     let mut patterns = collect_patterns(song);
     let (song_patterns, subpatterns) = patterns.split_at_mut(song.patterns.len());
 
@@ -309,7 +309,7 @@ fn find_pattern_overlap(patterns: &[OptimisedPattern]) -> (Vec<(usize, usize)>, 
     // And, in the end, we only retain the ordering with the best score.
     new_row
         .into_iter()
-        .filter_map(|opt| opt)
+        .flatten()
         .max_by_key(|(_, score)| *score)
         .expect("How come no ordering survived!?")
 }

@@ -75,7 +75,7 @@ fn main() {
         };
     }
 
-    let data = match std::fs::read(&input_path) {
+    let data = match std::fs::read(input_path) {
         Ok(data) => data,
         Err(err) => {
             write_error!("Failed to read file \"{}\": ", input_path.display();
@@ -91,6 +91,7 @@ fn main() {
             exit(1);
         }
     };
+    println!("{:?}", song.timer_divider);
 
     let (cell_pool, optim_stats) = optimise::optimise(&song);
 

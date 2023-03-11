@@ -68,7 +68,7 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
     for i in 0..4 {
         write!(output, ".ch{}  dw", i + 1).unwrap();
         for id in &song.order_matrix {
-            write!(output, " .{:2},", PatternId::Pattern(id[i].into())).unwrap();
+            write!(output, " .{:2},", PatternId::Pattern(id[i])).unwrap();
         }
         output!();
     }

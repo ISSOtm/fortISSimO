@@ -19,7 +19,7 @@ use crate::song::{
 
 type PResult<'input, O> = IResult<&'input [u8], O, InnerError<'input>>;
 
-pub fn parse_song<'input>(input: &'input [u8]) -> Result<Song<'_>, ParseError<'input>> {
+pub fn parse_song(input: &[u8]) -> Result<Song<'_>, ParseError<'_>> {
     let (song_input, version) = integer(input).map_err(|_| ParseErrorKind::NotUge)?;
 
     let parser = match version {
@@ -309,23 +309,42 @@ struct RawCell {
     effect_params: u8,
 }
 
-fn cell_v2(input: &[u8]) -> PResult<RawCell> {
-    fn inner(input: &[u8]) -> PResult<RawCell> {
-        let (input, note) = try_convert(input, integer)?;
-        let (input, instrument) = try_convert(input, integer)?;
-        let (input, jump_index) = try_convert(input, integer)?; // TODO: bounds checking
-        let (input, effect_code) = try_convert(input, integer)?;
-        let (input, effect_params) = nom::number::complete::u8(input)?;
-
-        Ok((
-            input,
-            RawCell {
+impl RawCell {
+    fn try_new(
+        note: u8,
+        instrument: u8,
+        jump_index: u8,
+        effect_code: EffectId,
+        effect_params: u8,
+    ) -> Result<Self, InnerErrorKind> {
+        if instrument >= 16 {
+            Err(InnerErrorKind::BadInstrument(instrument))
+        } else if jump_index >= 32 {
+            Err(InnerErrorKind::BadJumpIndex(jump_index))
+        } else {
+            Ok(Self {
                 note,
                 instrument,
                 jump_index,
                 effect_code,
                 effect_params,
-            },
+            })
+        }
+    }
+}
+
+fn cell_v2(input: &[u8]) -> PResult<RawCell> {
+    fn inner(input: &[u8]) -> PResult<RawCell> {
+        let (input, note) = try_convert(input, integer)?;
+        let (input, instrument) = try_convert(input, integer)?;
+        let (input, jump_index) = try_convert(input, integer)?;
+        let (input, effect_code) = try_convert(input, integer)?;
+        let (input, effect_params) = nom::number::complete::u8(input)?;
+
+        Ok((
+            input,
+            RawCell::try_new(note, instrument, jump_index, effect_code, effect_params)
+                .map_err(|err_kind| InnerError::err(input, err_kind))?,
         ))
     }
     context("parsing v2 cell from here", inner)(input)
@@ -450,6 +469,8 @@ enum InnerErrorKind {
     BadWaveOutLevel(u32),
     BadLfsrWidth(u32),
     BadNote(u32),
+    BadInstrument(u8),
+    BadJumpIndex(u8),
     BadEffectId(u32),
     BadWave(u8),
     OrderNotMatrix(usize, usize, usize, usize),
@@ -469,6 +490,8 @@ impl Display for InnerErrorKind {
             Self::BadWaveOutLevel(n) => write!(f, "Wave output level out of range (0x{n:08x})"),
             Self::BadLfsrWidth(n) => write!(f, "LFSR width out of range (0x{n:08x})"),
             Self::BadNote(n) => write!(f, "Note out of range (0x{n:08x})"),
+            Self::BadInstrument(n) => write!(f, "Instrument out of range (0x{n:02x}))"),
+            Self::BadJumpIndex(n) => write!(f, "Bad jump index (0x{n:02x})"),
             Self::BadEffectId(n) => write!(f, "Effect ID out of range (0x{n:08x})"),
             Self::BadWave(raw) => write!(f, "Wave sample out of range (0x{raw:02x})"),
             Self::OrderNotMatrix(ch1, ch2, ch3, ch4) => write!(
@@ -498,7 +521,7 @@ fn try_convert<'input, T, U: TryConstrain<T>, F: Fn(&'input [u8]) -> PResult<'in
     let (remaining, raw) = parser(input)?;
     match raw.try_constrain() {
         Ok(t) => Ok((remaining, t)),
-        Err(err) => Err(InnerError::err(input, err.into())),
+        Err(err) => Err(InnerError::err(input, err)),
     }
 }
 // TODO: get rid of this function, it's passed the wrong `input` and reporting the wrong location
@@ -642,16 +665,16 @@ impl TryConstrain<crate::song::Note> for u32 {
         use crate::song::Note::*;
 
         match self {
-            00 => Ok(C_3),
-            01 => Ok(CSharp3),
-            02 => Ok(D_3),
-            03 => Ok(DSharp3),
-            04 => Ok(E_3),
-            05 => Ok(F_3),
-            06 => Ok(FSharp3),
-            07 => Ok(G_3),
-            08 => Ok(GSharp3),
-            09 => Ok(A_3),
+            0 => Ok(C_3),
+            1 => Ok(CSharp3),
+            2 => Ok(D_3),
+            3 => Ok(DSharp3),
+            4 => Ok(E_3),
+            5 => Ok(F_3),
+            6 => Ok(FSharp3),
+            7 => Ok(G_3),
+            8 => Ok(GSharp3),
+            9 => Ok(A_3),
             10 => Ok(ASharp3),
             11 => Ok(B_3),
             12 => Ok(C_4),
