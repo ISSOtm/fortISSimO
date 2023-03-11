@@ -291,7 +291,6 @@ ENDC
 	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 	and PATTERN_LENGTH - 1
 	ld b, a
-	inc a ; Plus two 'cause we read rows backwards. TODO: have the tracker do this, but it requires reworking the subpattern code as well!
 	add a, a
 	add a, b
 	ld b, a
@@ -402,7 +401,6 @@ TickSubpattern:
 	ld a, [hld]
 	; One row is 3 bytes long.
 	ld e, a
-	inc a ; Plus two because we read rows backwards. TODO: have exporter emit rows inverted instead! (See similar TOOD further above)
 	add a, a
 	add a, e
 	ld e, a
@@ -422,10 +420,10 @@ TickSubpattern:
 	sub l
 	ld h, a
 	; Read the row's FX parameter.
-	ld a, [hld]
+	ld a, [hli]
 	ldh [hUGE_FxParam], a
 	runtime_assert TickSubpattern, [(([@hl] & $0F) * 2 + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
-	ld a, [hld] ; Read the jump target and FX ID.
+	ld a, [hli] ; Read the jump target and FX ID.
 	ld l, [hl] ; Read the note offset.
 	ld h, a ; We'll need to persist this for a bit.
 
@@ -563,15 +561,14 @@ ReadRow:
 	ld d, a
 	ld e, c
 	; Read the row into the channel's data.
-	; The rows are read backwards so that we finish with the note ID in a (more useful than FX params).
 	ld a, [de]
 	ld [hli], a
-	dec de
+	inc de
 	assert wCH1.fxParams + 1 == wCH1.instrAndFX
 	ld a, [de]
 	ld [hli], a
 	ld c, a
-	dec de
+	inc de
 	assert wCH1.instrAndFX + 1 == wCH1.note
 	ld a, [de]
 	runtime_assert ReadRow, a < {d:LAST_NOTE} || a == {d:___}, "Invalid note ID \{a,#\}"

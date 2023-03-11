@@ -66,7 +66,7 @@ MACRO dn
     ENDC
 
     ; And finally, the raw binary data.
-    db NOTE, INSTR << 4 | FX, FX_ARG
+    db FX_ARG, INSTR << 4 | FX, NOTE
 ENDM
 
 rsreset
