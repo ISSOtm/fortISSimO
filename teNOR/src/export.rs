@@ -260,7 +260,7 @@ impl Display for CellWithLine<'_> {
             OutputCell::Cell(cell) => {
                 write!(
                     f,
-                    "\tdn {}, {:X},{:02X} ; {}",
+                    "\t{}, {:X},{:02X} ; {}",
                     cell.0, cell.1.id as u8, cell.1.param, self.1,
                 )
             }
@@ -297,17 +297,17 @@ impl Display for SubpatternKind {
 impl Display for CellFirstHalf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Pattern { note, instrument } => write!(f, "{note}, {instrument:>2}"),
+            Self::Pattern { note, instrument } => write!(f, "row {note}, {instrument:>2}"),
             Self::Subpattern {
                 offset: 90,
                 next_row_idx,
-            } => write!(f, "sub, ___, {next_row_idx:>2}"),
+            } => write!(f, "sub_row ___, {next_row_idx:>2}"),
             Self::Subpattern {
                 offset,
                 next_row_idx,
             } => write!(
                 f,
-                "sub, {:>+3}, {next_row_idx:>2}",
+                "sub_row {:>+3}, {next_row_idx:>2}",
                 offset.wrapping_sub(LAST_NOTE / 2) as i8,
             ),
         }

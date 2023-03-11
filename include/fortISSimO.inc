@@ -4,24 +4,11 @@ DEF PATTERN_LENGTH equ 64 ; How many rows in a pattern.
 DEF ROW_SIZE equ 3 ; How many bytes per row.
 DEF ORDER_WIDTH equ 2 ; How many bytes in each order entry.
 
-; dn note, instr, effect
-MACRO dn
-    ; The tracker outputs a bunch of `dn` lines, whose arguments are identical to the tracker grid
-    ; for debuggability purposes.
+MACRO row ; Usage: `row note, instr, effect ID, effect param`
+    ; For practicality, the `row`'s arguments are meant to mirror what was in the tracker.
     ; However, some transformations can be made at compile time, which simplifies the driver, makes
     ; it faster, and most importantly, "loosens" the `jr` tangle hell that is the FX code.
-    IF _NARG == 4 ; Regular pattern
-        DEF NOTE = (\1)
-    ELSE ; Subpattern
-        shift ; Discard the dummy argument.
-        DEF STEAL_FLAG = ((\2) & $10) >> 4
-        IF STRCMP("\1", "___") == 0
-            DEF NOTE = ___
-        ELSE
-            DEF NOTE = ((LAST_NOTE / 2) \1)
-        ENDC
-        DEF NOTE = NOTE << 1 | STEAL_FLAG
-    ENDC
+    DEF NOTE = (\1)
     DEF INSTR = (\2) & $0F
     DEF FX = ($\3)
     DEF FX_ARG = ($\4)
@@ -67,6 +54,16 @@ MACRO dn
 
     ; And finally, the raw binary data.
     db FX_ARG, INSTR << 4 | FX, NOTE
+ENDM
+
+MACRO sub_row
+    DEF STEAL_FLAG = ((\2) & $10) >> 4
+    IF STRCMP("\1", "___") == 0
+        DEF NOTE = ___
+    ELSE
+        DEF NOTE = ((LAST_NOTE / 2) \1)
+    ENDC
+    row NOTE << 1 | STEAL_FLAG, \2 & $F, \3,\4
 ENDM
 
 rsreset
