@@ -1,7 +1,11 @@
 //! This module is entirely concerned with deserialising `.uge` files.
 //! The type definitions are extracted from `hugedatatypes.pas` and `song.pas`.
 
-use std::{borrow::Cow, fmt::Display, num::TryFromIntError};
+use std::{
+    borrow::Cow,
+    fmt::Display,
+    num::{NonZeroU8, TryFromIntError},
+};
 
 use nom::{
     bytes::complete::take,
@@ -82,8 +86,11 @@ fn song_v6(input: &[u8]) -> PResult<Song<'_>> {
         let (input, waves) = wave_bank_v2(input)?;
         let (input, ticks_per_row) = try_convert(input, integer)?;
         let (input, timer_enabled) = boolean(input)?;
-        let (input, timer_divider) = integer(input)?;
-        let (input, patterns) = pattern_map_v2(input)?;
+        let (new_input, timer_divider) = integer(input)?;
+        let timer_divider = timer_divider
+            .try_into()
+            .map_err(|_| InnerError::err(input, InnerErrorKind::BadTimerDivider(timer_divider)))?;
+        let (input, patterns) = pattern_map_v2(new_input)?;
         let (input, order_matrix) = order_matrix(input)?;
         let (input, routines) = routine_bank(input)?;
 
@@ -96,16 +103,7 @@ fn song_v6(input: &[u8]) -> PResult<Song<'_>> {
                 instruments,
                 waves,
                 ticks_per_row,
-                timer_divider: if timer_enabled {
-                    Some(may_fail(
-                        input,
-                        (timer_divider + 1)
-                            .try_into()
-                            .and_then(|n: u8| n.try_into()),
-                    )?)
-                } else {
-                    None
-                },
+                timer_divider: timer_enabled.then_some(timer_divider),
                 patterns,
                 order_matrix,
                 routines,
@@ -142,8 +140,12 @@ fn instrument_v3(input: &[u8]) -> PResult<Instrument<'_>> {
         let kind_input = input;
         let (input, kind) = nom::number::complete::le_u32(input)?;
         let (input, name) = short_string(input)?;
-        let (input, length) = integer(input)?;
-        let (input, length_enabled) = boolean(input)?;
+        let (new_input, length) = integer(input)?;
+        if length >= 64 {
+            return Err(InnerError::err(input, InnerErrorKind::BadLength(length)));
+        }
+        let length = unsafe { NonZeroU8::new_unchecked(length as u8 + 1) };
+        let (input, length_enabled) = boolean(new_input)?;
         let (input, initial_volume) = nom::number::complete::u8(input)?;
         let (input, envelope_dir) = try_convert(input, nom::number::complete::le_u32)?;
         let (input, envelope_pace) = nom::number::complete::u8(input)?;
@@ -161,14 +163,7 @@ fn instrument_v3(input: &[u8]) -> PResult<Instrument<'_>> {
             input,
             Instrument {
                 name,
-                length: if length_enabled {
-                    Some(may_fail(
-                        input,
-                        (length + 1).try_into().and_then(|n: u8| n.try_into()),
-                    )?)
-                } else {
-                    None
-                },
+                length: length_enabled.then_some(length),
                 kind: match kind {
                     0 => InstrumentKind::Square {
                         initial_volume,
@@ -462,7 +457,9 @@ impl<'input> nom::error::ContextError<&'input [u8]> for InnerError<'input> {
 #[derive(Debug, Clone)]
 enum InnerErrorKind {
     BadBool(u8),
+    BadTimerDivider(u32),
     BadInstrType(u32),
+    BadLength(u32),
     BadEnvDir(u32),
     BadSweepDir(u32),
     BadDutyType(u8),
@@ -483,7 +480,9 @@ impl Display for InnerErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::BadBool(n) => write!(f, "Boolean out of range (0x{n:08x})"),
+            Self::BadTimerDivider(n) => write!(f, "Timer divider out of range (0x{n:08x})"),
             Self::BadInstrType(n) => write!(f, "Instrument type out of range (0x{n:08x})"),
+            Self::BadLength(n) => write!(f, "Length out of range ({n:08x})"),
             Self::BadEnvDir(n) => write!(f, "Envelope direction out of range (0x{n:08x})"),
             Self::BadSweepDir(n) => write!(f, "Sweep direction out of range (0x{n:08x})"),
             Self::BadDutyType(n) => write!(f, "Duty type out of range (0x{n:08x})"),
@@ -523,13 +522,6 @@ fn try_convert<'input, T, U: TryConstrain<T>, F: Fn(&'input [u8]) -> PResult<'in
         Ok(t) => Ok((remaining, t)),
         Err(err) => Err(InnerError::err(input, err)),
     }
-}
-// TODO: get rid of this function, it's passed the wrong `input` and reporting the wrong location
-fn may_fail<T, E: Into<InnerErrorKind>>(
-    input: &[u8],
-    res: Result<T, E>,
-) -> Result<T, nom::Err<InnerError>> {
-    res.map_err(|err| InnerError::err(input, err.into()))
 }
 
 trait TryConstrain<T> {

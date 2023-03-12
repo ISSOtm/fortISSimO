@@ -11,7 +11,7 @@ pub struct Song<'input> {
 
     pub ticks_per_row: u8,
 
-    pub timer_divider: Option<NonZeroU8>,
+    pub timer_divider: Option<u8>,
 
     pub patterns: Vec<Pattern>,
     pub order_matrix: Vec<[usize; 4]>,
