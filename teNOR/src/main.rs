@@ -1,7 +1,7 @@
 use std::{ffi::OsString, fmt::Display, io::Write, path::Path, process::exit};
 
 use clap::{Parser, ValueEnum};
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
+use termcolor::{Color, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
 
 mod export;
 mod optimise;
@@ -91,48 +91,22 @@ fn main() {
             exit(1);
         }
     };
-    println!("{:?}", song.timer_divider);
 
-    let (cell_pool, optim_stats) = optimise::optimise(&song);
+    let (cell_pool, duty_instr_usage, wave_instr_usage, noise_instr_usage, optim_stats) =
+        optimise::optimise(&song);
 
-    export::export(&args, &song, input_path, &cell_pool);
+    export::export(
+        &args,
+        &song,
+        input_path,
+        &cell_pool,
+        &duty_instr_usage,
+        &wave_instr_usage,
+        &noise_instr_usage,
+    );
 
     if !args.quiet {
-        stderr
-            .set_color(ColorSpec::new().set_underline(true))
-            .unwrap();
-        writeln!(stderr, "teNOR optimisation stats:").unwrap();
-        let mut report = |verb, how_many, what, bytes_saved| {
-            stderr.set_color(&ColorSpec::new()).unwrap();
-            write!(stderr, "\t{verb} {how_many} {what} saved ").unwrap();
-            stderr.set_color(ColorSpec::new().set_bold(true)).unwrap();
-            writeln!(stderr, "{bytes_saved} bytes").unwrap();
-        };
-        report(
-            "Pruning",
-            optim_stats.pruned_patterns,
-            "unreachable patterns",
-            optim_stats.saved_bytes_pruned_patterns(),
-        );
-        report(
-            "Trimming",
-            optim_stats.trimmed_rows,
-            "unreachable rows",
-            optim_stats.saved_bytes_trimmed_rows(),
-        );
-        report(
-            "Overlapping",
-            optim_stats.overlapped_rows,
-            "rows",
-            optim_stats.saved_bytes_overlapped_rows(),
-        );
-        writeln!(
-            stderr,
-            "Total: {} bytes saved",
-            optim_stats.total_saved_bytes()
-        )
-        .unwrap();
-        stderr.set_color(&ColorSpec::new()).unwrap();
+        print_stats(&mut stderr, &optim_stats);
     }
 }
 
@@ -155,4 +129,71 @@ impl Display for CliColorChoice {
             Self::Never => write!(f, "never"),
         }
     }
+}
+
+fn print_stats(stderr: &mut StandardStreamLock<'_>, optim_stats: &optimise::OptimStats) {
+    stderr
+        .set_color(ColorSpec::new().set_underline(true))
+        .unwrap();
+    writeln!(stderr, "teNOR optimisation stats:").unwrap();
+    let mut report = |verb, how_many, what, bytes_saved| {
+        let mut color_spec = ColorSpec::new();
+        if bytes_saved == 0 {
+            color_spec.set_dimmed(true).set_italic(true);
+        }
+        stderr.set_color(&color_spec).unwrap();
+        write!(stderr, "\t{verb} {how_many} {what} saved ").unwrap();
+        stderr
+            .set_color(color_spec.set_bold(bytes_saved != 0))
+            .unwrap();
+        writeln!(stderr, "{bytes_saved} bytes").unwrap();
+    };
+    report(
+        "Pruning",
+        optim_stats.pruned_patterns,
+        "unreachable patterns",
+        optim_stats.saved_bytes_pruned_patterns(),
+    );
+    report(
+        "Trimming",
+        optim_stats.trimmed_rows,
+        "unreachable rows",
+        optim_stats.saved_bytes_trimmed_rows(),
+    );
+    report(
+        "Overlapping",
+        optim_stats.overlapped_rows,
+        "rows",
+        optim_stats.saved_bytes_overlapped_rows(),
+    );
+    report(
+        "Omitting",
+        optim_stats.pruned_instrs,
+        "unused instruments",
+        optim_stats.pruned_instrs_bytes,
+    );
+    if optim_stats.duplicated_patterns != 0 {
+        stderr.set_color(&ColorSpec::new()).unwrap();
+        write!(
+            stderr,
+            "\t...though duplicating {} patterns wasted ",
+            optim_stats.duplicated_patterns
+        )
+        .unwrap();
+        stderr.set_color(ColorSpec::new().set_bold(true)).unwrap();
+        writeln!(
+            stderr,
+            "{} bytes",
+            optim_stats.wasted_bytes_duplicated_patterns()
+        )
+        .unwrap();
+    }
+    write!(
+        stderr,
+        "Total: {} bytes saved",
+        optim_stats.total_saved_bytes()
+    )
+    .unwrap();
+    stderr.set_color(&ColorSpec::new()).unwrap();
+    writeln!(stderr, " (...plus ~80 extra.)").unwrap();
 }

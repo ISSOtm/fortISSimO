@@ -25,12 +25,6 @@ pub struct InstrCollection<'input> {
     pub noise: InstrumentBank<'input>,
 }
 
-impl InstrCollection<'_> {
-    pub const fn len(&self) -> usize {
-        self.duty.len() + self.wave.len() + self.noise.len()
-    }
-}
-
 pub type InstrumentBank<'input> = [Instrument<'input>; 15];
 
 #[derive(Debug, Clone, Default)]
@@ -62,6 +56,16 @@ pub enum InstrumentKind {
         envelope_pace: u8,
         lfsr_width: LfsrWidth,
     },
+}
+
+impl InstrumentKind {
+    pub fn data_size(&self) -> usize {
+        match self {
+            Self::Square { .. } => 6,
+            Self::Wave { .. } => 6,
+            Self::Noise { .. } => 6,
+        }
+    }
 }
 
 impl Default for InstrumentKind {

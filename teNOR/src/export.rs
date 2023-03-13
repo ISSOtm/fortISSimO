@@ -9,7 +9,7 @@ use std::{
 use clap::{crate_name, crate_version};
 
 use crate::{
-    optimise::{CellFirstHalf, OutputCell, PatternId, SubpatternKind},
+    optimise::{CellFirstHalf, CompactedMapping, InstrKind, OutputCell, PatternId},
     song::{
         DutyType, EnvelopeDirection, Instrument, InstrumentKind, LfsrWidth, Note, Song, Subpattern,
         SweepDirection, WaveOutputLevel,
@@ -17,7 +17,15 @@ use crate::{
     CliArgs, LAST_NOTE,
 };
 
-pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: &[OutputCell]) {
+pub(super) fn export(
+    args: &CliArgs,
+    song: &Song,
+    input_path: &Path,
+    cell_pool: &[OutputCell],
+    duty_instr_usage: &CompactedMapping<15>,
+    wave_instr_usage: &CompactedMapping<15>,
+    noise_instr_usage: &CompactedMapping<15>,
+) {
     let mut output = Output::new(args.output_path.as_ref());
     macro_rules! output {
         ($($arg:tt)*) => {
@@ -66,9 +74,10 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
     output!();
 
     for i in 0..4 {
+        let kind = InstrKind::from_channel_id(i);
         write!(output, ".ch{}  dw", i + 1).unwrap();
         for id in &song.order_matrix {
-            write!(output, " .{:2},", PatternId::Pattern(id[i])).unwrap();
+            write!(output, " .{:2},", PatternId::Pattern(kind, id[i])).unwrap();
         }
         output!();
     }
@@ -94,7 +103,9 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
     }
 
     output!(".dutyInstrs");
-    for (id, instr) in song.instruments.duty.iter().enumerate() {
+    for id in duty_instr_usage.iter() {
+        let instr = &song.instruments.duty[usize::from(id)];
+        let id = id + 1;
         let &InstrumentKind::Square {
             initial_volume,
             envelope_dir,
@@ -107,7 +118,7 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
             panic!("Non-duty instrument in duty instr bank!?");
         };
 
-        output!("; Duty instrument {}: {}", id + 1, instr.name);
+        output!("; Duty instrument {}: {}", id, instr.name);
         output!(
             "\tdb {} << 4 | {} | {} ; Sweep (NR10)",
             sweep_time,
@@ -131,7 +142,7 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
             "\tdw {} ; Subpattern pointer",
             (SubpatternPtr::new(
                 &instr.subpattern,
-                PatternId::Subpattern(SubpatternKind::Duty, id)
+                PatternId::Subpattern(InstrKind::Duty, id.into())
             )),
         );
         output!(
@@ -142,12 +153,14 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
     output!();
 
     output!(".waveInstrs");
-    for (id, instr) in song.instruments.wave.iter().enumerate() {
+    for id in wave_instr_usage.iter() {
+        let instr = &song.instruments.wave[usize::from(id)];
+        let id = id + 1;
         let &InstrumentKind::Wave { output_level, waveform } = &instr.kind else {
             panic!("Non-wave instrument in wave instr bank!?");
         };
 
-        output!("; Wave instrument {}: {}", id + 1, instr.name);
+        output!("; Wave instrument {}: {}", id, instr.name);
         output!("\tdb {} ; Length (NR31)", decode_len(instr),);
         output!("\tdb {output_level} ; Output level (NR32)");
         output!("\tdb {waveform} ; Wave ID");
@@ -155,7 +168,7 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
             "\tdw {} ; Subpattern pointer",
             (SubpatternPtr::new(
                 &instr.subpattern,
-                PatternId::Subpattern(SubpatternKind::Wave, id)
+                PatternId::Subpattern(InstrKind::Wave, id.into())
             )),
         );
         output!(
@@ -166,7 +179,9 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
     output!();
 
     output!(".noiseInstrs");
-    for (id, instr) in song.instruments.noise.iter().enumerate() {
+    for id in noise_instr_usage.iter() {
+        let instr = &song.instruments.noise[usize::from(id)];
+        let id = id + 1;
         let &InstrumentKind::Noise {
             initial_volume,
             envelope_dir,
@@ -176,7 +191,7 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
             panic!("Non-noise instrument in noise instr bank!?");
         };
 
-        output!("; Noise instrument {}: {}", id + 1, instr.name);
+        output!("; Noise instrument {}: {}", id, instr.name);
         output!(
             "\tdb {} ; Volume & envelope (NR42)",
             NRx2 {
@@ -189,7 +204,7 @@ pub(super) fn export(args: &CliArgs, song: &Song, input_path: &Path, cell_pool: 
             "\tdw {} ; Subpattern pointer",
             (SubpatternPtr::new(
                 &instr.subpattern,
-                PatternId::Subpattern(SubpatternKind::Noise, id)
+                PatternId::Subpattern(InstrKind::Noise, id.into())
             )),
         );
         output!(
@@ -278,13 +293,13 @@ impl Display for PatternId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let width = f.width().unwrap_or(0);
         match self {
-            Self::Pattern(id) => write!(f, "p{id:<width$}"),
-            Self::Subpattern(kind, id) => write!(f, "{kind}{:<width$}Subpattern", id + 1),
+            Self::Pattern(kind, id) => write!(f, "{kind}Ptrn{id:<width$}"),
+            Self::Subpattern(kind, id) => write!(f, "{kind}Inst{:<width$}Subpattern", id),
         }
     }
 }
 
-impl Display for SubpatternKind {
+impl Display for InstrKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Duty => write!(f, "duty"),
