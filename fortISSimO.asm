@@ -1527,14 +1527,10 @@ PlayNoiseNote:
 	jr z, .noNoiseInstr
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
-	; Noise instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
+	; Noise instruments are 4 bytes each, and we currently have the index times 16; scale it down a bit.
 	; TODO: assert that this is the case!
-	; TODO: 2 of those bytes are unused! This would also simplify the code below (3b/3c).
 	rra ; *8 now.
 	rra ; *4 now.
-	ld e, a
-	rra ; *2 now.
-	add a, e ; *2 + *4 = *6, perfect!
 	ld e, a
 	ld hl, wNoiseInstrs
 	ld a, [hli]

@@ -214,7 +214,6 @@ pub(super) fn export(
             instr.length.is_some() as u8,
             decode_len(instr),
         );
-        output!("\tds 2 ; Padding");
     }
     output!();
 

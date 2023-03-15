@@ -63,7 +63,7 @@ impl InstrumentKind {
         match self {
             Self::Square { .. } => 6,
             Self::Wave { .. } => 6,
-            Self::Noise { .. } => 6,
+            Self::Noise { .. } => 4,
         }
     }
 }
