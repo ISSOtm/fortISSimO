@@ -202,5 +202,5 @@ fn print_stats(stderr: &mut StandardStreamLock<'_>, optim_stats: &optimise::Opti
     )
     .unwrap();
     stderr.set_color(&ColorSpec::new()).unwrap();
-    writeln!(stderr, " (...give or take a few.)").unwrap();
+    writeln!(stderr, " (give or take a few.)").unwrap();
 }

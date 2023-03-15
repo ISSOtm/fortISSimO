@@ -501,7 +501,7 @@ fn trim_trailing_unreachable_rows(
             .find(|(_, cell)| cell.reachable)
         {
             Some((last_used_idx, _)) => {
-                *trimmed_rows += pattern.len() - last_used_idx;
+                *trimmed_rows += pattern.len() - (last_used_idx + 1);
                 pattern.truncate(last_used_idx + 1);
             }
             None => {
