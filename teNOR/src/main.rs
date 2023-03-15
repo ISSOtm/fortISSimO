@@ -92,7 +92,7 @@ fn main() {
         }
     };
 
-    let (cell_pool, duty_instr_usage, wave_instr_usage, noise_instr_usage, optim_stats) =
+    let (cell_pool, duty_instr_usage, wave_instr_usage, noise_instr_usage, wave_usage, optim_stats) =
         optimise::optimise(&song);
 
     export::export(
@@ -103,6 +103,7 @@ fn main() {
         &duty_instr_usage,
         &wave_instr_usage,
         &noise_instr_usage,
+        &wave_usage,
     );
 
     if !args.quiet {
@@ -172,6 +173,12 @@ fn print_stats(stderr: &mut StandardStreamLock<'_>, optim_stats: &optimise::Opti
         "unused instruments",
         optim_stats.pruned_instrs_bytes,
     );
+    report(
+        "Skipping",
+        optim_stats.trimmed_waves,
+        "unused waves",
+        optim_stats.saved_bytes_trimmed_waves(),
+    );
     if optim_stats.duplicated_patterns != 0 {
         stderr.set_color(&ColorSpec::new()).unwrap();
         write!(
@@ -195,5 +202,5 @@ fn print_stats(stderr: &mut StandardStreamLock<'_>, optim_stats: &optimise::Opti
     )
     .unwrap();
     stderr.set_color(&ColorSpec::new()).unwrap();
-    writeln!(stderr, " (...plus ~80 extra.)").unwrap();
+    writeln!(stderr, " (...give or take a few.)").unwrap();
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::song::{EffectId, Instrument, Note, PatternCell, Song, SubpatternCell};
+use crate::song::{EffectId, Instrument, InstrumentKind, Note, PatternCell, Song, SubpatternCell};
 
 pub fn optimise(
     song: &Song,
@@ -9,6 +9,7 @@ pub fn optimise(
     CompactedMapping<15>,
     CompactedMapping<15>,
     CompactedMapping<15>,
+    CompactedMapping<16>,
     OptimStats,
 ) {
     let mut patterns = collect_patterns(song);
@@ -79,7 +80,17 @@ pub fn optimise(
         )
     }
 
-    // TODO: eliminate "dead" waves and reorder remaining ones (account for `9` effect on CH3!)
+    // Eliminate "dead" waves and reorder remaining ones.
+    // The last usage contributor unaccounted for is wave instruments.
+    for (i, instr) in song.instruments.wave.iter().enumerate() {
+        if used_wave_instrs & 1 << i == 0 {
+            continue; // Ignore unused instruments.
+        }
+        let InstrumentKind::Wave { output_level: _, wave_id } = instr.kind else { unreachable!(); };
+        used_waves |= 1 << wave_id;
+    }
+    let wave_usage = compacted_mapping_from_mask(used_waves);
+    remap_waves(&mut patterns, &wave_usage.0);
 
     // TODO: pattern deduplication (including finding patterns "in the middle of" of others) would
     //       cut down on the number of patterns, and potentially speed up following steps.
@@ -116,9 +127,9 @@ pub fn optimise(
         pruned_patterns,
         pruned_pattern_rows,
         trimmed_rows,
-        pruned_instrs: duty_instr_usage.nb_instrs_saved()
-            + wave_instr_usage.nb_instrs_saved()
-            + noise_instr_usage.nb_instrs_saved(),
+        pruned_instrs: duty_instr_usage.nb_saved()
+            + wave_instr_usage.nb_saved()
+            + noise_instr_usage.nb_saved(),
         pruned_instrs_bytes: saved_bytes_instrs(
             &song.instruments.duty,
             &duty_instr_usage.0[duty_instr_usage.1..],
@@ -129,6 +140,7 @@ pub fn optimise(
             &song.instruments.noise,
             &noise_instr_usage.0[noise_instr_usage.1..],
         ),
+        trimmed_waves: wave_usage.nb_saved(),
     };
 
     (
@@ -136,6 +148,7 @@ pub fn optimise(
         duty_instr_usage,
         wave_instr_usage,
         noise_instr_usage,
+        wave_usage,
         stats,
     )
 }
@@ -149,6 +162,7 @@ pub struct OptimStats {
     pub trimmed_rows: usize,
     pub pruned_instrs: usize,
     pub pruned_instrs_bytes: usize,
+    pub trimmed_waves: usize,
 }
 
 impl OptimStats {
@@ -168,12 +182,17 @@ impl OptimStats {
         self.trimmed_rows * 3
     }
 
+    pub fn saved_bytes_trimmed_waves(&self) -> usize {
+        self.trimmed_waves * 16
+    }
+
     pub fn total_saved_bytes(&self) -> isize {
         (self.saved_bytes_overlapped_rows()
             + self.saved_bytes_pruned_patterns()
             + self.saved_bytes_trimmed_rows()
-            + self.pruned_instrs_bytes)
-            .wrapping_sub(self.wasted_bytes_duplicated_patterns()) as isize // I doubt the savings will ever grow that large...
+            + self.pruned_instrs_bytes
+            + self.saved_bytes_trimmed_waves())
+        .wrapping_sub(self.wasted_bytes_duplicated_patterns()) as isize // I doubt the savings will ever grow that large...
     }
 }
 
@@ -533,7 +552,7 @@ impl<const N: usize> CompactedMapping<N> {
         self.0[..self.1].iter().cloned()
     }
 
-    fn nb_instrs_saved(&self) -> usize {
+    fn nb_saved(&self) -> usize {
         N - self.1
     }
 }
@@ -546,6 +565,26 @@ fn remap_instrs(pattern: &mut OptimisedPattern, mapping: &[u8; 15]) {
         if *instrument != 0 {
             // Actual instruments are 1-indexed.
             *instrument = mapping[usize::from(*instrument) - 1] + 1;
+        }
+    }
+}
+
+fn remap_waves(patterns: &mut HashMap<PatternId, OptimisedPattern>, mapping: &[u8; 16]) {
+    for (id, pattern) in patterns {
+        if matches!(
+            id,
+            PatternId::Pattern(InstrKind::Wave, _) | PatternId::Subpattern(InstrKind::Wave, _)
+        ) {
+            for cell in &mut pattern.0 {
+                let AnnotatedCell { reachable: true, cell } = cell else { continue; };
+                if let Effect {
+                    id: EffectId::ChangeTimbre,
+                    param,
+                } = &mut cell.1
+                {
+                    *param = mapping[usize::from(*param)];
+                }
+            }
         }
     }
 }

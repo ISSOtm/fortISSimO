@@ -176,7 +176,7 @@ fn instrument_v3(input: &[u8]) -> PResult<Instrument<'_>> {
                     },
                     1 => InstrumentKind::Wave {
                         output_level,
-                        waveform,
+                        wave_id: waveform,
                     },
                     2 => InstrumentKind::Noise {
                         initial_volume,

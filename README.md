@@ -1,15 +1,14 @@
 # fortISSimO
 
 A speed- and size-focused Game Boy music driver, intended for use with [hUGETracker](https://nickfa.ro/index.php/HUGETracker).
+
+**Do you want to use fortISSimO? Then please go to the `docs` directory above!**
 A table [comparing pros and cons of many GB music drivers](https://github.com/ISSOtm/fortISSimO/wiki/Drivers-comparison) is available on the wiki.
 
 Want to use fortISSimO in your Game Boy game?
 **Please read `INTEGRATION.md`!**
 
 For documentation and example of usage, see [fortISSimO-demo](https://github.com/ISSOtm/fortISSimO-demo).
-
-fortISSimO can be used free of charge, as it is .
-*Mentioning me and SuperDisk in your credits and/or linking here would be highly appreciated, though!*
 
 ## Comparison with hUGEDriver
 
@@ -99,7 +98,8 @@ Please only use hUGETracker 1.0b10: earlier versions are just not compatible, an
 
 ## License
 
-[![CC0 licensed (public domain)](https://licensebuttons.net/p/zero/1.0/80x15.png)](http://creativecommons.org/publicdomain/zero/1.0/) To follow the license of hUGETracker and hUGEDriver, fortISSimO is dedicated to the public domain.
+[![CC0 licensed (public domain)](https://licensebuttons.net/p/zero/1.0/80x15.png)](http://creativecommons.org/publicdomain/zero/1.0/)
+To follow the license of hUGETracker and hUGEDriver, fortISSimO is dedicated to the public domain.
 
 <p xmlns:dct="http://purl.org/dc/terms/" xmlns:vcard="http://www.w3.org/2001/vcard-rdf/3.0#">
   To the extent possible under law, all copyright and related or neighboring rights to

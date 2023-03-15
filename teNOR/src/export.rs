@@ -25,6 +25,7 @@ pub(super) fn export(
     duty_instr_usage: &CompactedMapping<15>,
     wave_instr_usage: &CompactedMapping<15>,
     noise_instr_usage: &CompactedMapping<15>,
+    wave_usage: &CompactedMapping<16>,
 ) {
     let mut output = Output::new(args.output_path.as_ref());
     macro_rules! output {
@@ -156,7 +157,7 @@ pub(super) fn export(
     for id in wave_instr_usage.iter() {
         let instr = &song.instruments.wave[usize::from(id)];
         let id = id + 1;
-        let &InstrumentKind::Wave { output_level, waveform } = &instr.kind else {
+        let &InstrumentKind::Wave { output_level, wave_id: waveform } = &instr.kind else {
             panic!("Non-wave instrument in wave instr bank!?");
         };
 
@@ -218,12 +219,12 @@ pub(super) fn export(
     output!();
 
     output!(".waves");
-    for (id, wave) in song.waves.iter().enumerate() {
+    for id in wave_usage.iter() {
         write!(output, "\tdb ").unwrap();
-        for byte in wave {
+        for byte in &song.waves[usize::from(id)] {
             write!(output, "${byte:02x},").unwrap();
         }
-        output!(" ; {id}");
+        output!(" ; Originally #{id}");
     }
     output!();
 

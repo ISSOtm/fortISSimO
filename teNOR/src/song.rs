@@ -48,7 +48,7 @@ pub enum InstrumentKind {
     },
     Wave {
         output_level: WaveOutputLevel,
-        waveform: u8,
+        wave_id: u8,
     },
     Noise {
         initial_volume: u8,
@@ -72,7 +72,7 @@ impl Default for InstrumentKind {
     fn default() -> Self {
         Self::Wave {
             output_level: WaveOutputLevel::Mute,
-            waveform: 0,
+            wave_id: 0,
         }
     }
 }
