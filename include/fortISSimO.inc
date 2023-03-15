@@ -1,5 +1,7 @@
 ; This file is to be included by generated songs as well.
 
+IF !DEF(PATTERN_LENGTH) ; Simple include guard.
+
 DEF PATTERN_LENGTH equ 64 ; How many rows in a pattern.
 DEF ROW_SIZE equ 3 ; How many bytes per row.
 DEF ORDER_WIDTH equ 2 ; How many bytes in each order entry.
@@ -159,3 +161,5 @@ def FX_SET_VOLUME rb
 def FX_PATTERN_BRK rb
 def FX_NOTE_CUT rb
 def FX_SET_SPEED rb
+
+ENDC
