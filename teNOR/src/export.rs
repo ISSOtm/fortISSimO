@@ -164,7 +164,6 @@ pub(super) fn export(
         output!("; Wave instrument {}: {}", id, instr.name);
         output!("\tdb {} ; Length (NR31)", decode_len(instr),);
         output!("\tdb {output_level} ; Output level (NR32)");
-        output!("\tdb {waveform} ; Wave ID");
         output!(
             "\tdw {} ; Subpattern pointer",
             (SubpatternPtr::new(
@@ -176,6 +175,7 @@ pub(super) fn export(
             "\tdb $80 | {} << 6 ; Retrigger bit, and length enable (NRx4)",
             instr.length.is_some() as u8,
         );
+        output!("\tdb {waveform} ; Wave ID");
     }
     output!();
 

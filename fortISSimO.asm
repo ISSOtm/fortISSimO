@@ -1466,18 +1466,17 @@ PlayWaveNote:
 	ldh [rNR31], a
 	ld a, [hli] ; Volume & envelope.
 	ldh [rNR32], a
-	ld a, [hli] ; Read wave ID for later. TODO: move it last!
-	ld e, a
 	ld a, [hli] ; Subpattern pointer.
 	ld [wCH3.subPattern], a
 	ld a, [hli]
 	ld [wCH3.subPattern + 1], a
 	xor a ; Subpattern row counter.
 	ld [wCH3.subPatternRow], a
-	ld a, [hl] ; NRx4 mask.
+	ld a, [hli] ; NRx4 mask.
 	runtime_assert PlayWaveNote, @a & $80, "Instrument without trigger bit!"
 	ld [wCH3.lengthBit], a
 	; Check if a new wave must be loaded.
+	ld e, [hl]
 	ld a, [hUGE_LoadedWaveID]
 	cp e
 	call nz, LoadWave
