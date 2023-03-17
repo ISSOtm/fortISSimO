@@ -592,7 +592,6 @@ LoadWave:
 	ld a, e
 .waveInA
 	ld [hUGE_LoadedWaveID], a
-	swap a ; TODO: it would be more useful if this was already multiplied by 16
 	ld hl, wWaves
 	add a, [hl]
 	inc hl

@@ -175,7 +175,7 @@ pub(super) fn export(
             "\tdb $80 | {} << 6 ; Retrigger bit, and length enable (NRx4)",
             instr.length.is_some() as u8,
         );
-        output!("\tdb {waveform} ; Wave ID");
+        output!("\tdb {waveform} << 4 ; Wave ID");
     }
     output!();
 
