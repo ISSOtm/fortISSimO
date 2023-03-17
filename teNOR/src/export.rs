@@ -71,8 +71,6 @@ pub(super) fn export(
     output!("\tdw .routine");
     output!("\tdw .waves");
     output!();
-    output!("\tdw .ch1, .ch2, .ch3, .ch4");
-    output!();
 
     for i in 0..4 {
         let kind = InstrKind::from_channel_id(i);

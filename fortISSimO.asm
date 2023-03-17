@@ -121,10 +121,11 @@ hUGE_StartSong::
 	inc de
 
 	assert wTicksPerRow + 1 == wLastPatternIdx
-	; TODO: pointing to a single byte is a bit silly
 	ld a, [de]
 	ld [hli], a
-	; No `inc de` because the loops pre-increment. (This saves one byte + cycle.)
+	add a, 2
+	ld b, a ; Cache the size of each order table for later.
+	inc de
 
 	assert wLastPatternIdx + 1 == wDutyInstrs
 	assert wDutyInstrs + 2 == wWaveInstrs
@@ -133,9 +134,9 @@ hUGE_StartSong::
 	assert wRoutine + 2 == wWaves
 	ld c, 2 + 2 + 2 + 2 + 2
 .copyPointers
-	inc de
 	ld a, [de]
 	ld [hli], a
+	inc de
 	dec c
 	jr nz, .copyPointers
 
@@ -168,12 +169,14 @@ ENDC
 .initChannel
 	assert wCH1 == wCH1.order
 	; Copy the order pointer.
-	inc de
-	ld a, [de]
+	ld a, e
 	ld [hli], a
-	inc de
-	ld a, [de]
+	add a, b
+	ld e, a
+	ld a, d
 	ld [hli], a
+	adc a, 0
+	ld d, a
 	assert wCH1.order + 2 == wCH1.fxParams
 	inc hl ; Skip FX params.
 	assert wCH1.fxParams + 1 == wCH1.instrAndFX
