@@ -682,7 +682,7 @@ FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
 .ch3
 	ld a, b
 	call LoadWave.waveInA
-	; We now need to retrigger the channel, since we needed to stop it to reload the wave.
+	; We now need to retrigger the channel, since we had to stop it to reload the wave.
 	ld hl, wCH3.period + 1
 	ld a, [hld] ; It's annoying that these bits are there, but that's how it is.
 	dec hl
@@ -1438,7 +1438,7 @@ PlayWaveNote:
 	; First, apply the instrument.
 	ld a, [wCH3.instrAndFX]
 	and $F0 ; Keep the instrument bits.
-	ld hl, wCH3.lengthBit
+	runtime_assert PlayWaveNote, !@zf || [wCH3.lengthBit] & $80 == 0, "CH3 must only be retriggered on instr code path!" ; See the comment further below about killing CH3.
 	jr z, .noWaveInstr
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
@@ -1481,6 +1481,11 @@ PlayWaveNote:
 	ld a, [hUGE_LoadedWaveID]
 	cp e
 	call nz, LoadWave
+	; Careful—triggering CH3 while it's reading wave RAM can corrupt it.
+	; We first kill the channel, and re-enable it, which has it enabled but not playing.
+	ld hl, rNR30
+	ld [hl], l ; This has bit 7 reset, killing the channel.
+	ld [hl], h ; This has bit 7 set, re-enabling the channel.
 .noWaveInstr
 
 	; Next, apply the note.
@@ -1492,11 +1497,6 @@ PlayWaveNote:
 	adc a, HIGH(PeriodTable)
 	sub e
 	ld d, a
-	; Careful—triggering CH3 while it's reading wave RAM can corrupt it.
-	; We first kill the channel, and re-enable it, which has it enabled but not playing.
-	ld hl, rNR30
-	ld [hl], l ; This has bit 7 reset, killing the channel.
-	ld [hl], h ; This has bit 7 set, re-enabling the channel.
 	; Write it.
 	ld hl, wCH3.period
 	ld a, [de] ; LOW(Period).
