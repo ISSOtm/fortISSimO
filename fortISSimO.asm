@@ -396,7 +396,6 @@ ENDC
 ; @param c:  The channel's mask (the CHx_MASK constant).
 ; @destroy a bc de hl (potentially)
 TickSubpattern:
-	; TODO: change the way it's generated to eliminate `.subPatternRow`.
 	ld a, [hld] ; Read the length bit.
 	ld b, a
 	assert wCH1.lengthBit - 1 == wCH1.subPatternRow

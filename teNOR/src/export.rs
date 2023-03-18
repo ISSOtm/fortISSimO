@@ -6,6 +6,7 @@ use std::{
     process::exit,
 };
 
+use chrono::prelude::*;
 use clap::{crate_name, crate_version};
 
 use crate::{
@@ -34,7 +35,11 @@ pub(super) fn export(
         };
     }
 
-    output!("; Generated from {} on TODO: date", input_path.display());
+    output!(
+        "; Generated from {} on {}",
+        input_path.display(),
+        Utc::now().trunc_subsecs(0),
+    );
     output!("; Song: {}", song.name);
     output!("; Artist: {}", song.artist);
     output!("; Comment: {}", song.comment);
