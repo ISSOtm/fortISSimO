@@ -49,8 +49,10 @@ pub(super) fn export(
         crate_name!(),
         crate_version!(),
     );
-    output!("INCLUDE \"{}\"", args.include_path);
-    output!();
+    if !args.include_path.is_empty() {
+        output!("INCLUDE \"{}\"", args.include_path);
+        output!();
+    }
     output!();
     if let Some(kind) = &args.section_type {
         output!("SECTION \"{}\", {kind}", args.section_name);

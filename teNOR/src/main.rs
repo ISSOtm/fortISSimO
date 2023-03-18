@@ -21,6 +21,7 @@ struct CliArgs {
 
     /// Path to include file to emit.
     /// Keep in mind that this path will be evaluated by RGBASM, so relative to the directory that it will be invoked in!
+    /// If empty, no INCLUDE directive will be emitted.
     #[arg(short, long, default_value = "fortISSimO.inc")]
     include_path: String,
 
