@@ -98,7 +98,38 @@ IF DEF(HUGETRACKER) && !DEF(PREVIEW_MODE)
 ENDC
 _hUGE_SelectSong:: ; C interface.
 ; @param de: Pointer to the "song descriptor" to load.
+; @destroy af bc de hl
 hUGE_SelectSong::
+	; Silence channels that aren't muted.
+	; Note that we ensure the channels have their DACs active, to avoid pops when they come back online.
+	ldh a, [hUGE_MutedChannels]
+	rra
+	ld c, a
+	jr c, .ch1NotOurs
+	; Mute the channel without killing it.
+	ld a, AUDENV_UP
+	ldh [rNR12], a
+.ch1NotOurs
+	rr c
+	jr c, .ch2NotOurs
+	; Mute the channel without killing it.
+	ld a, AUDENV_UP
+	ldh [rNR22], a
+.ch2NotOurs
+	rr c
+	jr c, .ch3NotOurs
+	; Kill the channel, then immediately re-enable it.
+	ld hl, rNR30
+	ld [hl], l ; This has bit 7 reset.
+	ld [hl], h ; This has bit 7 set.
+.ch3NotOurs
+	rr c
+	jr c, .ch4NotOurs
+	; Mute the channel without killing it.
+	ld a, AUDENV_UP
+	ldh [rNR42], a
+.ch4NotOurs
+
 	ld hl, hUGE_LoadedWaveID
 	ld a, hUGE_NO_WAVE
 	ld [hli], a
