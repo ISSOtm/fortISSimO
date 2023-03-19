@@ -11,7 +11,7 @@ MACRO row ; Usage: `row note, instr, effect ID, effect param`
     ; However, some transformations can be made at compile time, which simplifies the driver, makes
     ; it faster, and most importantly, "loosens" the `jr` tangle hell that is the FX code.
     DEF NOTE = (\1)
-    DEF INSTR = (\2) & $0F
+    DEF INSTR = (\2)
     DEF FX = ($\3)
     DEF FX_ARG = ($\4)
     assert FX_ARG == LOW(FX_ARG), "Bad FX arg {FX_ARG}"
@@ -162,4 +162,12 @@ def FX_PATTERN_BRK rb
 def FX_NOTE_CUT rb
 def FX_SET_SPEED rb
 
+; hUGETracker compatibility layer.
+MACRO dn
+    DEF STEAL_FLAG = (\2) >> 4
+    DEF INSTR = (\2) & $0F
+    DEF FX = HIGH(\3)
+    DEF FX_ARG = LOW(\3)
+    row \1 | {STEAL_FLAG} << 7, {d:INSTR}, {x:FX},{x:FX_ARG}
+ENDM
 ENDC

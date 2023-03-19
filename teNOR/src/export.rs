@@ -44,7 +44,7 @@ pub(super) fn export(
     output!("; Artist: {}", song.artist);
     output!("; Comment: {}", song.comment);
     if let Some(divider) = song.timer_divider {
-        output!("; Expected playback method: TIMA = ${:02x}", divider);
+        output!("; Expected playback method: TMA = ${:02x}", divider);
     } else {
         output!("; Expected playback method: VBlank");
     }

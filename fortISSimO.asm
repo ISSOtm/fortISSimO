@@ -43,8 +43,15 @@ IF !DEF(FORTISSIMO_RAM)
 ENDC
 
 
-INCLUDE "hardware.inc" ; Bread & butter: check.
-INCLUDE "fortISSimO.inc" ; Get the note constants.
+IF !DEF(HUGETRACKER)
+	INCLUDE "hardware.inc" ; Bread & butter: check.
+	INCLUDE "fortISSimO.inc" ; Get the note constants.
+ELSE ; The above files are accessed differently when inside hUGETracker.
+	INCLUDE "include/hardware.inc"
+	INCLUDE "include/hUGE.inc"
+	PURGE row ; Otherwise we have a conflict later, lol.
+ENDC
+
 
 	rev_Check_hardware_inc 4.2
 
@@ -91,11 +98,6 @@ IF STRLEN("{FORTISSIMO_ROM}") != 0
 	SECTION "Sound Driver", FORTISSIMO_ROM
 ENDC
 
-IF DEF(HUGETRACKER) && !DEF(PREVIEW_MODE)
-	hUGE_init:: ; Polyfill for hUGETracker's ROM export.
-		ld d, h
-		ld e, l
-ENDC
 _hUGE_SelectSong:: ; C interface.
 ; @param de: Pointer to the "song descriptor" to load.
 ; @destroy af bc de hl
@@ -246,9 +248,6 @@ ENDC
 	ret
 
 
-IF DEF(HUGETRACKER) && !DEF(PREVIEW_MODE)
-	hUGE_dosound:: ; Polyfill for hUGETracker's ROM export.
-ENDC
 _hUGE_TickSound:: ; C interface.
 hUGE_TickSound::
 	; Disable all muted channels.
@@ -1700,7 +1699,11 @@ ContinueFx: ; TODO: if this is short enough, swapping it with the other path may
 
 
 PeriodTable:
-	INCLUDE "hUGE_note_table.inc"
+	IF !DEF(HUGETRACKER)
+		INCLUDE "hUGE_note_table.inc"
+	ELSE
+		INCLUDE "include/hUGE_note_table.inc"
+	ENDC
 
 
 PUSHS
@@ -1775,6 +1778,7 @@ MACRO channel
 		.polynom: db
 		ds 3 ; Ensures that both branches are the same size.
 	ENDC
+	.end
 ENDM
 
 wCH1:  channel 1
@@ -1812,12 +1816,275 @@ hUGE_AllowedChannels: db ; Bit mask of which channels the driver is allowed to u
 
 POPS
 
-IF DEF(PREVIEW_MODE)
-	hUGE_init::
-		ld d, h
-		ld e, l
-		jp hUGE_SelectSong
 
+;; hUGETracker compatibility layer follows.
+
+
+IF DEF(HUGETRACKER)
+	PUSHS
+		SECTION "Converted data", WRAM0
+		wConvertedNoiseInstrs: ds 15 * 4
+		wConvertedWaveInstrs: ds 15 * 6
+		wConvertedDutyInstrs: ds 15 * 6
+		wConvertedHeader:
+			.tempo: db
+			.maxIndex: db
+			.instrPtrs: ds 2 * 3
+			.routine: dw
+			.waves: dw
+
+		; This is too big for WRAM0 when WRAMX exists, so we have to split this.
+		; Eugh ><
+		SECTION "Converted subpatterns pt.1", WRAM0[$D000 - 2 * 15 * 32 * 3]
+		wConvertedSubpatterns: ds 2 * 15 * 32 * 3
+			assert @ == $D000
+		SECTION "Converted subpatterns pt.2", WRAMX[$D000]
+			ds 1 * 15 * 32 * 3
+		wConvertedSubpatternsPtr: dw
+	POPS
+
+	; hUGETracker generates a different "track header", which must be translated so that fO can understand it.
+	; @param hl: Pointer to song header.
+	hUGE_init::
+		; This init routine is not particularly optimised, since the cycle budget in the tracker is much more lenient.
+
+		; Perform what would normally be the "global init".
+		xor a
+		ldh [hUGE_MutedChannels], a
+
+		; Begin converting the song header from hD's format to fO's.
+
+		ld a, [hli] ; Tempo byte.
+		ld [wConvertedHeader.tempo], a
+
+		; Pointer to `order_cnt`.
+		ld a, [hli]
+		ld e, a
+		ld a, [hli]
+		ld d, a
+		ld a, [de]
+		sub 2 ; hD stores the size times two, fO stores the ID of the last one times two.
+		ld [wConvertedHeader.maxIndex], a
+
+		; Order pointers.
+		; We'll need them later.
+		ld c, 4
+	.saveOrderPtr
+		ld a, [hli]
+		ld e, a
+		ld a, [hli]
+		ld d, a
+		push de
+		dec c
+		jr nz, .saveOrderPtr
+
+		; All instrument data needs to be converted, as the subpattern row format is different in hD and fO.
+		REPT 3
+			ld a, [hli]
+			ld e, a
+			ld a, [hli]
+			ld d, a
+			push de
+		ENDR
+
+		; Stub out the routine.
+		inc hl
+		inc hl
+		ld a, LOW(KnownRet)
+		ld [wConvertedHeader.routine], a
+		ld a, HIGH(KnownRet)
+		ld [wConvertedHeader.routine + 1], a
+
+		; And finally, the waves.
+		ld a, [hli]
+		ld [wConvertedHeader.waves], a
+		ld a, [hli]
+		ld [wConvertedHeader.waves + 1], a
+
+		; Convert the instruments.
+
+		ld a, LOW(wConvertedSubpatterns)
+		ld [wConvertedSubpatternsPtr], a
+		ld a, HIGH(wConvertedSubpatterns)
+		ld [wConvertedSubpatternsPtr + 1], a
+
+		pop de
+		ld hl, wConvertedNoiseInstrs
+		ld c, 15
+	.convertNoiseInstr
+		ld a, [de] ; Volume & envelope.
+		inc de
+		ld [hli], a
+		call .convertSubpattern
+		ld a, [de] ; A bunch of flags.
+		inc de
+		ld [hli], a
+		inc de
+		inc de
+		dec c
+		jr nz, .convertNoiseInstr
+		ld a, LOW(wConvertedNoiseInstrs)
+		ld [wConvertedHeader.instrPtrs + 4], a
+		ld a, HIGH(wConvertedNoiseInstrs)
+		ld [wConvertedHeader.instrPtrs + 4 + 1], a
+
+		pop de
+		ld hl, wConvertedWaveInstrs
+		ld c, 15
+	.convertWaveInstr
+		; Length.
+		ld a, [de]
+		inc de
+		ld [hli], a
+		; Output level.
+		ld a, [de]
+		inc de
+		ld [hli], a
+		; Wave ID (last in fO).
+		ld a, [de]
+		inc de
+		push af
+		; Subpattern pointer.
+		call .convertSubpattern
+		; Retrigger bit and length enable.
+		ld a, [de]
+		inc de
+		ld [hli], a
+		; Write the wave ID.
+		pop af
+		ld [hli], a
+		dec c
+		jr nz, .convertWaveInstr
+		ld a, LOW(wConvertedWaveInstrs)
+		ld [wConvertedHeader.instrPtrs + 2], a
+		ld a, HIGH(wConvertedWaveInstrs)
+		ld [wConvertedHeader.instrPtrs + 2 + 1], a
+
+		pop de
+		ld hl, wConvertedDutyInstrs
+		ld c, 15
+	.convertDutyInstr
+		; Sweep.
+		ld a, [de]
+		inc de
+		ld [hli], a
+		; Duty & length.
+		ld a, [de]
+		inc de
+		ld [hli], a
+		; Volume & envelope.
+		ld a, [de]
+		inc de
+		ld [hli], a
+		; Subpattern pointer.
+		call .convertSubpattern
+		; Retrigger bit and length enable.
+		ld a, [de]
+		inc de
+		ld [hli], a
+		dec c
+		jr nz, .convertDutyInstr
+		ld a, LOW(wConvertedDutyInstrs)
+		ld [wConvertedHeader.instrPtrs], a
+		ld a, HIGH(wConvertedDutyInstrs)
+		ld [wConvertedHeader.instrPtrs + 1], a
+
+		; And now, load this converted header!
+		ld de, wConvertedHeader
+		call hUGE_SelectSong
+		; One small catch: normally, the pattern tables lie right after the header... but not here!
+		FOR N, 4, 0, -1
+			pop de
+			ld a, e
+			ld [wCH{d:N}.order], a
+			ld a, d
+			ld [wCH{d:N}.order + 1], a
+		ENDR
+		ret
+
+
+	.convertSubpattern
+		; Write the pointer to the subpattern we're about to write.
+		ld a, [wConvertedSubpatternsPtr]
+		ld [hli], a
+		ld a, [wConvertedSubpatternsPtr + 1]
+		ld [hli], a
+		push hl ; Save the write pointer for the caller.
+
+		; Get the read pointer.
+		ld a, [de]
+		inc de
+		ld l, a
+		ld a, [de]
+		inc de
+		ld h, a
+		or l
+		jr z, .emptySubpattern
+		push de ; Save the read pointer for the caller.
+		; Read the "pattern pool" pointer we'll write to.
+		ld a, [wConvertedSubpatternsPtr]
+		ld e, a
+		ld a, [wConvertedSubpatternsPtr + 1]
+		ld d, a
+
+		ld b, 32
+	.convertRow
+		ld a, [hli] ; FX arg.
+		ld [de], a
+		inc de
+
+		inc hl
+		ld a, [hld] ; Note & 5th jump bit (bit 4).
+		and $80 ; Only keep the jump bit.
+		rlca ; Move it to bit 0.
+		xor [hl]
+		and $0F
+		xor [hl]
+		; We got the jump target, which needs translating.
+		jr nz, .notDefaultTarget
+		ld a, 33
+		sub b
+		and $1F
+	.notDefaultTarget
+		swap a
+		push af ; Save it for actually writing the note.
+		xor [hl]
+		and $F0
+		xor [hl]
+		ld [de], a
+		inc de
+		inc hl
+
+		pop af ; Get back the jump target.
+		rra ; Push bit 4 (now in bit 0) into carry.
+		ld a, [hli] ; Read note & 5th jump bit again.
+		rla ; Discard original jump bit, shift in new one, and position the note correctly.
+		ld [de], a
+		inc de
+
+		dec b
+		jr nz, .convertRow
+
+		; Write back the "pattern pool" pointer.
+		ld a, e
+		ld [wConvertedSubpatternsPtr], a
+		ld a, d
+		ld [wConvertedSubpatternsPtr + 1], a
+		pop de
+		pop hl
+		ret
+
+	.emptySubpattern
+		pop hl
+		dec hl
+		dec hl
+		xor a
+		ld [hli], a
+		ld [hli], a
+		ret
+ENDC
+
+IF DEF(PREVIEW_MODE)
 	hUGE_dosound::
 		; Check if the tracker requested a change of orders.
 		ld a, [next_order]
@@ -1865,6 +2132,10 @@ IF DEF(PREVIEW_MODE)
 	row_break: db
 	next_order: db
 	loop_order: db ; If non-zero, instead of falling through to the next pattern, loop the current one.
+
+ELIF DEF(HUGETRACKER)
+	hUGE_dosound::
+		jp hUGE_TickSound
 ENDC
 
 
