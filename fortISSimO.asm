@@ -1523,7 +1523,6 @@ PlayNoiseNote:
 	; First, apply the instrument.
 	ld a, [wCH4.instrAndFX]
 	and $F0 ; Keep the instrument bits.
-	ld hl, wCH4.lengthBit
 	jr z, .noNoiseInstr
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
