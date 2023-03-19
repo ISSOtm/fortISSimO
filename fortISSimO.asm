@@ -96,9 +96,9 @@ IF DEF(HUGETRACKER) && !DEF(PREVIEW_MODE)
 		ld d, h
 		ld e, l
 ENDC
-_hUGE_StartSong:: ; C interface.
+_hUGE_SelectSong:: ; C interface.
 ; @param de: Pointer to the "song descriptor" to load.
-hUGE_StartSong::
+hUGE_SelectSong::
 	ld hl, hUGE_LoadedWaveID
 	ld a, hUGE_NO_WAVE
 	ld [hli], a
@@ -1785,7 +1785,7 @@ IF DEF(PREVIEW_MODE)
 	hUGE_init::
 		ld d, h
 		ld e, l
-		jp hUGE_StartSong
+		jp hUGE_SelectSong
 
 	hUGE_dosound::
 		; Check if the tracker requested a change of orders.
