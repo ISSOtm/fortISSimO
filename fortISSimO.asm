@@ -457,6 +457,7 @@ TickSubpattern:
 	ld a, [de]
 	add a, l
 	sub LAST_NOTE / 2 ; Go from "unsigned range" to "signed range".
+	runtime_assert TickSubpattern, @a < {LAST_NOTE}, "Subpattern offset over/underflowed note ID! \{@a\}"
 	bit 3, c
 	assert hUGE_CH4_MASK == 1 << 3
 	jr nz, .ch4
