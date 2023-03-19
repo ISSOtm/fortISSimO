@@ -1328,7 +1328,7 @@ PlaySomeDutyNote:
 ; @destroy c de hl a
 PlayDutyNote:
 	; If the channel is inhibited, don't perform any writes.
-	ld a, [hUGE_MutedChannels]
+	ldh a, [hUGE_MutedChannels]
 	and e
 	ret nz
 
@@ -1432,7 +1432,7 @@ PlayDutyNote:
 ; @destroy c de hl a
 PlayWaveNote:
 	; If the channel is inhibited, don't perform any writes.
-	ld a, [hUGE_MutedChannels]
+	ldh a, [hUGE_MutedChannels]
 	and hUGE_CH3_MASK
 	ret nz
 
@@ -1517,7 +1517,7 @@ PlayWaveNote:
 ; @destroy c de hl a
 PlayNoiseNote:
 	; If the channel is inhibited, don't perform any writes.
-	ld a, [hUGE_MutedChannels]
+	ldh a, [hUGE_MutedChannels]
 	and hUGE_CH4_MASK
 	ret nz
 
