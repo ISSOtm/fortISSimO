@@ -8,10 +8,10 @@
 ;    and make sure to write the hUGETracker version between quotation marks.
 ;    For example, you'd get:   DEF HUGETRACKER equs "1.0"
 ;
-; DEF HUGETRACKER equs "1.0"
+; def HUGETRACKER equs "1.0"
 
 IF DEF(HUGETRACKER)
-	WARN "\n\tPlease report this issue to fortISSimO, *NOT* hUGETracker!\n\t(Even if it seems unrelated.)\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<\n\t"
+	WARN "\n\tPlease report this issue to fortISSimO, *NOT* hUGETracker!\n\t(Even if it seems unrelated.)\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<\n"
 	IF !STRCMP("{HUGETRACKER}", "1.0b10")
 	ELIF !STRCMP("{HUGETRACKER}", "1.0")
 	ELSE
@@ -1765,7 +1765,7 @@ MACRO channel
 			.portaTarget: dw
 		NEXTU
 			.vibratoOffset: db ; How much to add to `period` into NRx3/4.
-			.vibratoState: db ; Upper 4 bits count down, lower 4 bits contain the next offset from the base note.
+			.vibratoState: db ; Upper 4 bits count down, bit 0 contains the "direction" (0 = up, 1 = down).
 			; If the previous row contained a vibrato, then this contains its arg; if not, the low 4 bits are zero.
 			; (This is OK because the vibrato wouldn't be reset if and only if its own "slope" was 0,
 			; which makes it have no effect anyway.)

@@ -1,0 +1,19 @@
+[book]
+authors = ["ISSOtm"]
+language = "en"
+multilingual = false
+src = "src"
+title = "fortISSimO manual"
+
+[preprocessor.help-gen]
+command = "./help-gen.sh"
+before = [ "links" ]
+
+[output.html]
+curly-quotes = true
+git-repository-url = "https://github.com/ISSOtm/fortISSimO"
+edit-url-template = "https://github.com/ISSOtm/fortISSimO/edit/master/{path}"
+site-url = "/fortISSimO/"
+
+[output.linkcheck]
+optional = true
