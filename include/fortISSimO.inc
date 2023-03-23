@@ -2,18 +2,18 @@
 
 IF !DEF(PATTERN_LENGTH) ; Simple include guard.
 
-DEF PATTERN_LENGTH equ 64 ; How many rows in a pattern.
-DEF ROW_SIZE equ 3 ; How many bytes per row.
-DEF ORDER_WIDTH equ 2 ; How many bytes in each order entry.
+def PATTERN_LENGTH equ 64 ; How many rows in a pattern.
+def ROW_SIZE equ 3 ; How many bytes per row.
+def ORDER_WIDTH equ 2 ; How many bytes in each order entry.
 
 MACRO row ; Usage: `row note, instr, effect ID, effect param`
     ; For practicality, the `row`'s arguments are meant to mirror what was in the tracker.
     ; However, some transformations can be made at compile time, which simplifies the driver, makes
     ; it faster, and most importantly, "loosens" the `jr` tangle hell that is the FX code.
-    DEF NOTE = (\1)
-    DEF INSTR = (\2)
-    DEF FX = ($\3)
-    DEF FX_ARG = ($\4)
+    def NOTE = (\1)
+    def INSTR = (\2)
+    def FX = ($\3)
+    def FX_ARG = ($\4)
     assert FX_ARG == LOW(FX_ARG), "Bad FX arg {FX_ARG}"
 
     ; Some FX-specific transformations.
@@ -59,13 +59,29 @@ MACRO row ; Usage: `row note, instr, effect ID, effect param`
 ENDM
 
 MACRO sub_row
-    DEF STEAL_FLAG = ((\2) & $10) >> 4
+    def STEAL_FLAG = ((\2) & $10) >> 4
     IF STRCMP("\1", "___") == 0
-        DEF NOTE = ___
+        def NOTE = ___
     ELSE
-        DEF NOTE = ((LAST_NOTE / 2) \1)
+        def NOTE = ((LAST_NOTE / 2) \1)
     ENDC
-    row NOTE << 1 | STEAL_FLAG, \2 & $F, \3,\4
+
+    def FX = \2 & $F
+    IF FX == FX_TONE_PORTA
+        FAIL "Tone porta is not supported in subpatterns!"
+    ELIF FX == FX_NOTE_DELAY
+        FAIL "Note delay is not supported in subpatterns!"
+    ELIF FX == FX_POS_JUMP
+        FAIL "Position jump is not supported in subpatterns!"
+    ELIF FX == FX_PATTERN_BRK
+        FAIL "Pattern break is not supported in subpatterns!"
+    ELIF FX == FX_NOTE_CUT
+        FAIL "Note cut is not supported in subpatterns!"
+    ELIF FX == FX_SET_SPEED
+        FAIL "Set tempo is not supported in subpatterns!"
+    ENDC
+
+    row NOTE << 1 | STEAL_FLAG, FX, \3,\4
 ENDM
 
 rsreset
