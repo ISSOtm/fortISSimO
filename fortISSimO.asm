@@ -1776,8 +1776,8 @@ MACRO channel
 		.lfsrWidth: db
 		; The current "polynom" (what gets written to NR43).
 		.polynom: db
-		ds 3 ; Ensures that both branches are the same size.
 	ENDC
+	; WARNING: If adding any variables here, you may want to add padding to ensure the two `IF` arms above have the same size!
 	.end
 ENDM
 
