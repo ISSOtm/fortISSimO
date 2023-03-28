@@ -49,3 +49,6 @@ The operation is repeated as many times as there are patterns; then the row cont
 
 [^no_candidate]: It's possible that there are no candidates at all for a cell! Then the cell becomes empty.
 
+## License
+
+Unlike fortISSimO, teNOR is licensed under the Mozilla Public License 2.0.
