@@ -1,4 +1,5 @@
 [Foreword](./index.md)
+[Obtaining fortISSimO](./obtaining.md)
 [FAQ](./faq.md)
 
 # Composing for fortISSimO
