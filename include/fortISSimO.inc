@@ -66,7 +66,7 @@ MACRO sub_row
         def NOTE = ((LAST_NOTE / 2) \1)
     ENDC
 
-    def FX = \2 & $F
+    def FX = ($\3) & $F
     IF FX == FX_TONE_PORTA
         FAIL "Tone porta is not supported in subpatterns!"
     ELIF FX == FX_NOTE_DELAY
@@ -81,7 +81,7 @@ MACRO sub_row
         FAIL "Set tempo is not supported in subpatterns!"
     ENDC
 
-    row NOTE << 1 | STEAL_FLAG, FX, \3,\4
+    row NOTE << 1 | STEAL_FLAG, \2 & $F, {x:FX},\4
 ENDM
 
 rsreset
