@@ -9,6 +9,7 @@ mod song;
 mod uge;
 
 const LAST_NOTE: u8 = 72;
+const PATTERN_LENGTH: u8 = 64;
 
 #[derive(Debug, Clone, Parser)]
 #[command(version, about)]
@@ -98,22 +99,17 @@ fn main() {
         }
     };
 
-    let (cell_pool, duty_instr_usage, wave_instr_usage, noise_instr_usage, wave_usage, optim_stats) =
-        optimise::optimise(&song);
+    let (optim_results, optim_stats) = optimise::optimise(&song);
 
-    export::export(
-        &args,
-        &song,
-        input_path,
-        &cell_pool,
-        &duty_instr_usage,
-        &wave_instr_usage,
-        &noise_instr_usage,
-        &wave_usage,
-    );
+    if let nb_unique_cells @ 257.. = optim_results.cell_catalog.len() {
+        write_error!("The song has {nb_unique_cells} unique cells, the max is 256!\n" ; "There is not much that can be done, sorry. Try simplifying it?");
+        exit(1);
+    }
+
+    export::export(&args, &song, input_path, &optim_results);
 
     if !args.quiet {
-        print_stats(&mut stderr, &optim_stats);
+        print_stats(&mut stderr, &optim_stats, optim_results.cell_catalog.len());
     }
 }
 
@@ -138,12 +134,17 @@ impl Display for CliColorChoice {
     }
 }
 
-fn print_stats(stderr: &mut StandardStreamLock<'_>, optim_stats: &optimise::OptimStats) {
+fn print_stats(
+    stderr: &mut StandardStreamLock<'_>,
+    optim_stats: &optimise::OptimStats,
+    nb_unique_cells: usize,
+) {
     stderr
         .set_color(ColorSpec::new().set_underline(true))
         .unwrap();
     writeln!(stderr, "teNOR optimisation stats:").unwrap();
-    let mut report = |verb, how_many, what, bytes_saved| {
+
+    let report = |stderr: &mut StandardStreamLock<'_>, verb, how_many, what, bytes_saved| {
         let mut color_spec = ColorSpec::new();
         if bytes_saved == 0 {
             color_spec.set_dimmed(true).set_italic(true);
@@ -155,31 +156,37 @@ fn print_stats(stderr: &mut StandardStreamLock<'_>, optim_stats: &optimise::Opti
             .unwrap();
         writeln!(stderr, "{bytes_saved} bytes").unwrap();
     };
+
     report(
+        stderr,
         "Pruning",
         optim_stats.pruned_patterns,
         "unreachable patterns",
         optim_stats.saved_bytes_pruned_patterns(),
     );
     report(
+        stderr,
         "Trimming",
         optim_stats.trimmed_rows,
         "unreachable rows",
         optim_stats.saved_bytes_trimmed_rows(),
     );
     report(
+        stderr,
         "Overlapping",
         optim_stats.overlapped_rows,
         "rows",
         optim_stats.saved_bytes_overlapped_rows(),
     );
     report(
+        stderr,
         "Omitting",
         optim_stats.pruned_instrs,
         "unused instruments",
         optim_stats.pruned_instrs_bytes,
     );
     report(
+        stderr,
         "Skipping",
         optim_stats.trimmed_waves,
         "unused waves",
@@ -200,6 +207,25 @@ fn print_stats(stderr: &mut StandardStreamLock<'_>, optim_stats: &optimise::Opti
             optim_stats.wasted_bytes_duplicated_patterns()
         )
         .unwrap();
+    }
+    if optim_stats.saved_bytes_catalog >= 0 {
+        report(
+            stderr,
+            "Cataloguing",
+            nb_unique_cells,
+            "unique cells",
+            optim_stats.saved_bytes_catalog as usize,
+        );
+    } else {
+        stderr.set_color(&ColorSpec::new()).unwrap();
+        write!(
+            stderr,
+            "\t...cataloguing {} unique cells wasted ",
+            nb_unique_cells
+        )
+        .unwrap();
+        stderr.set_color(ColorSpec::new().set_bold(true)).unwrap();
+        writeln!(stderr, "{} bytes", -optim_stats.saved_bytes_catalog).unwrap();
     }
     write!(
         stderr,

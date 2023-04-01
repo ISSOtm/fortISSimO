@@ -10,23 +10,26 @@ use chrono::prelude::*;
 use clap::{crate_name, crate_version};
 
 use crate::{
-    optimise::{CellFirstHalf, CompactedMapping, InstrKind, OutputCell, PatternId},
+    optimise::{InstrKind, OptimResults, OutputCell, PatternId},
     song::{
-        DutyType, EnvelopeDirection, Instrument, InstrumentKind, LfsrWidth, Note, Song, Subpattern,
+        DutyType, EnvelopeDirection, Instrument, InstrumentKind, LfsrWidth, Song, Subpattern,
         SweepDirection, WaveOutputLevel,
     },
-    CliArgs, LAST_NOTE,
+    CliArgs, LAST_NOTE, PATTERN_LENGTH,
 };
 
 pub(super) fn export(
     args: &CliArgs,
     song: &Song,
     input_path: &Path,
-    cell_pool: &[OutputCell],
-    duty_instr_usage: &CompactedMapping<15>,
-    wave_instr_usage: &CompactedMapping<15>,
-    noise_instr_usage: &CompactedMapping<15>,
-    wave_usage: &CompactedMapping<16>,
+    OptimResults {
+        row_pool,
+        cell_catalog,
+        duty_instr_usage,
+        wave_instr_usage,
+        noise_instr_usage,
+        wave_usage,
+    }: &OptimResults,
 ) {
     let mut output = Output::new(args.output_path.as_ref());
     macro_rules! output {
@@ -82,6 +85,7 @@ pub(super) fn export(
     output!("\tdw .dutyInstrs, .waveInstrs, .noiseInstrs");
     output!("\tdw .routine");
     output!("\tdw .waves");
+    output!("\tdb HIGH(.cellCatalog)");
     output!();
 
     for i in 0..4 {
@@ -94,16 +98,64 @@ pub(super) fn export(
     }
     output!();
 
+    let mut reverse_lookup = [0; 256];
+    for (i, id) in cell_catalog.values().enumerate() {
+        reverse_lookup[usize::from(*id)] = i as u8;
+    }
     let mut row_idx = 0;
-    for entry in cell_pool {
-        output!("{}", CellWithLine(entry, row_idx));
-        row_idx += 1;
-        if matches!(entry, OutputCell::Label(_)) {
-            row_idx = 0
+    for entry in row_pool {
+        match entry {
+            OutputCell::Label(whose) => {
+                write!(output, "\n.{whose}").unwrap();
+                row_idx = 0;
+            }
+            OutputCell::Cell(id) => {
+                write!(
+                    output,
+                    "{}{:3}",
+                    if row_idx == 0 { "\n\tdb " } else { "," },
+                    reverse_lookup[usize::from(*id)]
+                )
+                .unwrap();
+                row_idx += 1;
+            }
+            OutputCell::OverlapMarker(1) => {
+                write!(output, "\n\t; Continued on next row.").unwrap();
+            }
+            OutputCell::OverlapMarker(how_many) => {
+                write!(output, "\n\t; Continued on next {how_many} rows.").unwrap();
+            }
         }
     }
     output!();
+    output!();
+    output!(".cellCatalog  align 8");
+    write!(output, "\tdb ").unwrap();
+    for cell in cell_catalog.keys() {
+        write!(output, "${:02x},", cell.first_byte()).unwrap();
+    }
+    output!();
+    output!(
+        "\tds {} ; Padding to maintain alignment",
+        256 - cell_catalog.len()
+    );
+    write!(output, "\tdb ").unwrap();
+    for cell in cell_catalog.keys() {
+        write!(output, "${:02x},", cell.second_byte()).unwrap();
+    }
+    output!();
+    output!(
+        "\tds {} ; Padding to maintain alignment",
+        256 - cell_catalog.len()
+    );
+    write!(output, "\tdb ").unwrap();
+    for cell in cell_catalog.keys() {
+        write!(output, "${:02x},", cell.third_byte()).unwrap();
+    }
+    output!();
+    output!();
     output!("assert LAST_NOTE == {LAST_NOTE}, \"LAST_NOTE == {{LAST_NOTE}}\"");
+    output!("assert PATTERN_LENGTH == {PATTERN_LENGTH}, \"PATTERN_LENGTH == {{PATTERN_LENGTH}}\"");
     output!();
 
     fn decode_len(instr: &Instrument) -> u8 {
@@ -275,30 +327,6 @@ impl Output {
     }
 }
 
-#[derive(Debug, Clone)]
-struct CellWithLine<'cell>(&'cell OutputCell, usize);
-
-impl Display for CellWithLine<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            OutputCell::Label(whose) => write!(f, ".{whose}"),
-            OutputCell::Cell(cell) => {
-                write!(
-                    f,
-                    "\t{}, {:X},{:02X} ; {}",
-                    cell.0, cell.1.id as u8, cell.1.param, self.1,
-                )
-            }
-            OutputCell::OverlapMarker(1) => {
-                write!(f, "\t; Continued on next row.")
-            }
-            OutputCell::OverlapMarker(how_many) => {
-                write!(f, "\t; Continued on next {how_many} rows.")
-            }
-        }
-    }
-}
-
 impl Display for PatternId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let width = f.width().unwrap_or(0);
@@ -315,106 +343,6 @@ impl Display for InstrKind {
             Self::Duty => write!(f, "duty"),
             Self::Wave => write!(f, "wave"),
             Self::Noise => write!(f, "noise"),
-        }
-    }
-}
-
-impl Display for CellFirstHalf {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Pattern { note, instrument } => write!(f, "row {note}, {instrument:>2}"),
-            Self::Subpattern {
-                offset: 90,
-                next_row_idx,
-            } => write!(f, "sub_row ___, {next_row_idx:>2}"),
-            Self::Subpattern {
-                offset,
-                next_row_idx,
-            } => write!(
-                f,
-                "sub_row {:>+3}, {next_row_idx:>2}",
-                offset.wrapping_sub(LAST_NOTE / 2) as i8,
-            ),
-        }
-    }
-}
-
-impl Display for Note {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Note::C_3 => write!(f, "C_3"),
-            Note::CSharp3 => write!(f, "C#3"),
-            Note::D_3 => write!(f, "D_3"),
-            Note::DSharp3 => write!(f, "D#3"),
-            Note::E_3 => write!(f, "E_3"),
-            Note::F_3 => write!(f, "F_3"),
-            Note::FSharp3 => write!(f, "F#3"),
-            Note::G_3 => write!(f, "G_3"),
-            Note::GSharp3 => write!(f, "G#3"),
-            Note::A_3 => write!(f, "A_3"),
-            Note::ASharp3 => write!(f, "A#3"),
-            Note::B_3 => write!(f, "B_3"),
-            Note::C_4 => write!(f, "C_4"),
-            Note::CSharp4 => write!(f, "C#4"),
-            Note::D_4 => write!(f, "D_4"),
-            Note::DSharp4 => write!(f, "D#4"),
-            Note::E_4 => write!(f, "E_4"),
-            Note::F_4 => write!(f, "F_4"),
-            Note::FSharp4 => write!(f, "F#4"),
-            Note::G_4 => write!(f, "G_4"),
-            Note::GSharp4 => write!(f, "G#4"),
-            Note::A_4 => write!(f, "A_4"),
-            Note::ASharp4 => write!(f, "A#4"),
-            Note::B_4 => write!(f, "B_4"),
-            Note::C_5 => write!(f, "C_5"),
-            Note::CSharp5 => write!(f, "C#5"),
-            Note::D_5 => write!(f, "D_5"),
-            Note::DSharp5 => write!(f, "D#5"),
-            Note::E_5 => write!(f, "E_5"),
-            Note::F_5 => write!(f, "F_5"),
-            Note::FSharp5 => write!(f, "F#5"),
-            Note::G_5 => write!(f, "G_5"),
-            Note::GSharp5 => write!(f, "G#5"),
-            Note::A_5 => write!(f, "A_5"),
-            Note::ASharp5 => write!(f, "A#5"),
-            Note::B_5 => write!(f, "B_5"),
-            Note::C_6 => write!(f, "C_6"),
-            Note::CSharp6 => write!(f, "C#6"),
-            Note::D_6 => write!(f, "D_6"),
-            Note::DSharp6 => write!(f, "D#6"),
-            Note::E_6 => write!(f, "E_6"),
-            Note::F_6 => write!(f, "F_6"),
-            Note::FSharp6 => write!(f, "F#6"),
-            Note::G_6 => write!(f, "G_6"),
-            Note::GSharp6 => write!(f, "G#6"),
-            Note::A_6 => write!(f, "A_6"),
-            Note::ASharp6 => write!(f, "A#6"),
-            Note::B_6 => write!(f, "B_6"),
-            Note::C_7 => write!(f, "C_7"),
-            Note::CSharp7 => write!(f, "C#7"),
-            Note::D_7 => write!(f, "D_7"),
-            Note::DSharp7 => write!(f, "D#7"),
-            Note::E_7 => write!(f, "E_7"),
-            Note::F_7 => write!(f, "F_7"),
-            Note::FSharp7 => write!(f, "F#7"),
-            Note::G_7 => write!(f, "G_7"),
-            Note::GSharp7 => write!(f, "G#7"),
-            Note::A_7 => write!(f, "A_7"),
-            Note::ASharp7 => write!(f, "A#7"),
-            Note::B_7 => write!(f, "B_7"),
-            Note::C_8 => write!(f, "C_8"),
-            Note::CSharp8 => write!(f, "C#8"),
-            Note::D_8 => write!(f, "D_8"),
-            Note::DSharp8 => write!(f, "D#8"),
-            Note::E_8 => write!(f, "E_8"),
-            Note::F_8 => write!(f, "F_8"),
-            Note::FSharp8 => write!(f, "F#8"),
-            Note::G_8 => write!(f, "G_8"),
-            Note::GSharp8 => write!(f, "G#8"),
-            Note::A_8 => write!(f, "A_8"),
-            Note::ASharp8 => write!(f, "A#8"),
-            Note::B_8 => write!(f, "B_8"),
-            Note::None => write!(f, "___"),
         }
     }
 }

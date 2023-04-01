@@ -1,17 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash, num::Wrapping};
 
-use crate::song::{EffectId, Instrument, InstrumentKind, Note, PatternCell, Song, SubpatternCell};
+use crate::{
+    song::{EffectId, Instrument, InstrumentKind, Note, PatternCell, Song, SubpatternCell},
+    PATTERN_LENGTH,
+};
 
-pub fn optimise(
-    song: &Song,
-) -> (
-    Vec<OutputCell>,
-    CompactedMapping<15>,
-    CompactedMapping<15>,
-    CompactedMapping<15>,
-    CompactedMapping<16>,
-    OptimStats,
-) {
+pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
     let mut patterns = collect_patterns(song);
 
     let (used_duty_instrs, used_wave_instrs, used_noise_instrs, mut used_waves) =
@@ -95,7 +89,7 @@ pub fn optimise(
     // TODO: pattern deduplication (including finding patterns "in the middle of" of others) would
     //       cut down on the number of patterns, and potentially speed up following steps.
     let (pattern_ordering, overlapped_rows) = find_pattern_overlap(&patterns);
-    let cell_pool = generate_cell_pool(&patterns, &pattern_ordering);
+    let (row_pool, cell_map, saved_bytes_catalog) = generate_row_pool(&patterns, &pattern_ordering);
 
     // We're done! Time to compute some stats for reporting, and return our hard work!
 
@@ -141,16 +135,30 @@ pub fn optimise(
             &noise_instr_usage.0[noise_instr_usage.1..],
         ),
         trimmed_waves: wave_usage.nb_saved(),
+        saved_bytes_catalog,
     };
 
     (
-        cell_pool,
-        duty_instr_usage,
-        wave_instr_usage,
-        noise_instr_usage,
-        wave_usage,
+        OptimResults {
+            row_pool,
+            cell_catalog: cell_map,
+            duty_instr_usage,
+            wave_instr_usage,
+            noise_instr_usage,
+            wave_usage,
+        },
         stats,
     )
+}
+
+#[derive(Debug)]
+pub struct OptimResults {
+    pub row_pool: Vec<OutputCell>,
+    pub cell_catalog: HashMap<Cell, u8>,
+    pub duty_instr_usage: CompactedMapping<15>,
+    pub wave_instr_usage: CompactedMapping<15>,
+    pub noise_instr_usage: CompactedMapping<15>,
+    pub wave_usage: CompactedMapping<16>,
 }
 
 #[derive(Debug, Clone)]
@@ -163,6 +171,7 @@ pub struct OptimStats {
     pub pruned_instrs: usize,
     pub pruned_instrs_bytes: usize,
     pub trimmed_waves: usize,
+    pub saved_bytes_catalog: isize,
 }
 
 impl OptimStats {
@@ -193,6 +202,7 @@ impl OptimStats {
             + self.pruned_instrs_bytes
             + self.saved_bytes_trimmed_waves())
         .wrapping_sub(self.wasted_bytes_duplicated_patterns()) as isize // I doubt the savings will ever grow that large...
+        + self.saved_bytes_catalog
     }
 }
 
@@ -271,16 +281,82 @@ pub struct AnnotatedCell {
     cell: Cell,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Cell(pub CellFirstHalf, pub Effect);
 
-#[derive(Debug, Clone, Copy)]
+impl Cell {
+    // TODO: add a "validation" function, and report invalid cells during export.
+
+    pub fn first_byte(&self) -> u8 {
+        match self.1 {
+            Effect {
+                id: EffectId::PosJump,
+                param,
+            } => {
+                // This is 1-based in the tracker. Converting to `wOrderIdx` format requires subtracting 1.
+                (param - 1)
+                    // In addition, "pos jump" sets `wForceRow`, which causes the order index to be advanced; compensate for that as well.
+                    .wrapping_sub(1)
+                    // And, convert to "byte offset".
+                    .wrapping_mul(2)
+            }
+
+            Effect {
+                id: EffectId::SetVol,
+                param,
+            } => {
+                match (param >> 4, param & 0x0F) {
+                    // This would kill the channel; only mute it, but keep the DAC active.
+                    (envelope, 0) if envelope != 0 => 0x08,
+                    // Swap the nibbles to match NRx2 order.
+                    (envelope, volume) => volume << 4 | envelope,
+                }
+            }
+
+            Effect {
+                id: EffectId::PatternBreak,
+                param,
+            } => {
+                debug_assert!(PATTERN_LENGTH.is_power_of_two()); // So that the bit inversion below is correct.
+                debug_assert!(param - 1 < PATTERN_LENGTH);
+
+                // This is 1-based in the tracker. Converting to `wForceRow` format requires subtracting 1.
+                (param - 1)
+                // Convert to `wForceRow` format.
+                | !PATTERN_LENGTH
+            }
+
+            // Catch-all.
+            Effect { id: _, param } => param,
+        }
+    }
+
+    pub fn second_byte(&self) -> u8 {
+        (match self.0 {
+            CellFirstHalf::Pattern { instrument, .. } => instrument,
+            CellFirstHalf::Subpattern { next_row_idx, .. } => next_row_idx & 0x0F,
+        }) << 4
+            | self.1.id as u8
+    }
+
+    pub fn third_byte(&self) -> u8 {
+        match self.0 {
+            CellFirstHalf::Pattern { note, .. } => note as u8,
+            CellFirstHalf::Subpattern {
+                offset,
+                next_row_idx,
+            } => offset << 1 | (next_row_idx & 0x10) >> 4,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq)]
 pub enum CellFirstHalf {
     Pattern { note: Note, instrument: u8 },
     Subpattern { offset: u8, next_row_idx: u8 },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Effect {
     pub id: EffectId,
     pub param: u8,
@@ -676,32 +752,51 @@ fn find_pattern_overlap(
         .expect("How come no ordering survived!?")
 }
 
-fn generate_cell_pool(
+// TODO: we might also want to record the origin of all of these cells!
+fn generate_row_pool(
     patterns: &HashMap<PatternId, OptimisedPattern>,
     pattern_ordering: &[(PatternId, usize)],
-) -> Vec<OutputCell> {
+) -> (Vec<OutputCell>, HashMap<Cell, u8>, isize) {
     let mut rows = Vec::new();
+    let mut cells = HashMap::new();
+    let mut next_id = Wrapping(0); // An ID overflow will trigger an error later; just ensure we get there.
+    let mut nb_saved_bytes = 0;
+    let mut get_or_make_cell_id = |cell| {
+        // Each 3-byte cell is replaced with a 1-byte ID.
+        nb_saved_bytes += 2;
+
+        OutputCell::Cell(*cells.entry(cell).or_insert_with(|| {
+            // Inserting a new cell costs its 3 bytes.
+            nb_saved_bytes -= 3;
+
+            let new_id = next_id.0;
+            next_id += 1;
+            new_id
+        }))
+    };
 
     for (pattern_id, overlapped_rows) in pattern_ordering.iter().cloned() {
         let pattern = &patterns[&pattern_id];
         rows.push(OutputCell::Label(pattern_id));
+        // Register each of the pattern's cells, and "log" their IDs.
         rows.extend(
             pattern.0[..pattern.0.len() - overlapped_rows]
                 .iter()
-                .map(|cell| OutputCell::Cell(cell.cell)),
+                .map(|cell| get_or_make_cell_id(cell.cell)),
         );
         if overlapped_rows != 0 {
             rows.push(OutputCell::OverlapMarker(overlapped_rows));
         }
     }
 
-    rows
+    let nb_unique_cells = cells.len() as isize;
+    (rows, cells, nb_saved_bytes - (256 - nb_unique_cells) * 2)
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputCell {
     Label(PatternId),
-    Cell(Cell), // TODO: actually, if a cell overlaps between a pattern and a subpattern, it'd be nice to know that
+    Cell(u8),
     OverlapMarker(usize),
 }
 
@@ -721,22 +816,27 @@ impl AnnotatedCell {
     }
 }
 
+impl CellFirstHalf {
+    fn as_raw(&self) -> (u8, u8) {
+        match self {
+            CellFirstHalf::Pattern { note, instrument } => (*note as u8, *instrument),
+            CellFirstHalf::Subpattern {
+                offset,
+                next_row_idx,
+            } => (
+                offset << 1 | (next_row_idx & 0x10) >> 4,
+                next_row_idx & 0x0F,
+            ),
+        }
+    }
+}
 impl PartialEq for CellFirstHalf {
     fn eq(&self, other: &Self) -> bool {
-        // TOOD: this may be useful when exporting, actually
-        fn as_raw(half: &CellFirstHalf) -> (u8, u8) {
-            match half {
-                CellFirstHalf::Pattern { note, instrument } => (*note as u8, *instrument),
-                CellFirstHalf::Subpattern {
-                    offset,
-                    next_row_idx,
-                } => (
-                    offset << 1 | (next_row_idx & 0x10) >> 4,
-                    next_row_idx & 0x0F,
-                ),
-            }
-        }
-
-        as_raw(self) == as_raw(other)
+        self.as_raw() == other.as_raw()
+    }
+}
+impl Hash for CellFirstHalf {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_raw().hash(state)
     }
 }

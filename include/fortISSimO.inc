@@ -6,84 +6,6 @@ def PATTERN_LENGTH equ 64 ; How many rows in a pattern.
 def ROW_SIZE equ 3 ; How many bytes per row.
 def ORDER_WIDTH equ 2 ; How many bytes in each order entry.
 
-MACRO row ; Usage: `row note, instr, effect ID, effect param`
-    ; For practicality, the `row`'s arguments are meant to mirror what was in the tracker.
-    ; However, some transformations can be made at compile time, which simplifies the driver, makes
-    ; it faster, and most importantly, "loosens" the `jr` tangle hell that is the FX code.
-    def NOTE = (\1)
-    def INSTR = (\2)
-    def FX = ($\3)
-    def FX_ARG = ($\4)
-    assert FX_ARG == LOW(FX_ARG), "Bad FX arg {FX_ARG}"
-
-    ; Some FX-specific transformations.
-    ; TODO: at least do some `assert`s where relevant
-    IF FX == FX_ARPEGGIO
-    ELIF FX == FX_PORTA_UP
-    ELIF FX == FX_PORTA_DOWN
-    ELIF FX == FX_TONE_PORTA
-    ELIF FX == FX_VIBRATO
-    ELIF FX == FX_MASTER_VOL
-    ELIF FX == FX_ROUTINE
-    ELIF FX == FX_NOTE_DELAY
-        assert NOTE < LAST_NOTE, "Cannot use note delay without a note!"
-    ELIF FX == FX_PANNING
-    ELIF FX == FX_DUTY_CYCLE
-    ELIF FX == FX_VOL_SLIDE
-    ELIF FX == FX_POS_JUMP
-        ; This is 1-based in the tracker. Converting to `orderIdx` format requires subtracting 1.
-        def FX_ARG -= 1
-        ; In addition, this sets `wForceRow`, which causes the order index to be advanced; compensate for that as well.
-        def FX_ARG -= 1
-        ; Convert to "order index" format.
-        def FX_ARG *= 2
-    ELIF FX == FX_SET_VOLUME
-        def FX_ARG = LOW(FX_ARG << 4) | FX_ARG >> 4 ; Swap the two nibbles to match NRx2 format.
-        IF FX_ARG & $0F != 0 && FX_ARG & $F8 == 0
-            ; We would kill the channel! Let's mute it but avoid that.
-            def FX_ARG = $08 ; Set the volume to 0, but keep the channel alive to avoid a pop.
-        ENDC
-    ELIF FX == FX_PATTERN_BRK
-        assert FX_ARG != 0, "Pattern break is supposed to be 1-based!"
-        def FX_ARG -= 1
-        assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
-        def FX_ARG |= -PATTERN_LENGTH ; Convert to `forceRow` format.
-    ELIF FX == FX_NOTE_CUT
-    ELIF FX == FX_SET_SPEED
-    ELSE
-        FAIL "Unknown FX type {FX}"
-    ENDC
-
-    ; And finally, the raw binary data.
-    db FX_ARG, INSTR << 4 | FX, NOTE
-ENDM
-
-MACRO sub_row
-    def STEAL_FLAG = ((\2) & $10) >> 4
-    IF STRCMP("\1", "___") == 0
-        def NOTE = ___
-    ELSE
-        def NOTE = ((LAST_NOTE / 2) \1)
-    ENDC
-
-    def FX = ($\3) & $F
-    IF FX == FX_TONE_PORTA
-        FAIL "Tone porta is not supported in subpatterns!"
-    ELIF FX == FX_NOTE_DELAY
-        FAIL "Note delay is not supported in subpatterns!"
-    ELIF FX == FX_POS_JUMP
-        FAIL "Position jump is not supported in subpatterns!"
-    ELIF FX == FX_PATTERN_BRK
-        FAIL "Pattern break is not supported in subpatterns!"
-    ELIF FX == FX_NOTE_CUT
-        FAIL "Note cut is not supported in subpatterns!"
-    ELIF FX == FX_SET_SPEED
-        FAIL "Set tempo is not supported in subpatterns!"
-    ENDC
-
-    row NOTE << 1 | STEAL_FLAG, \2 & $F, {x:FX},\4
-ENDM
-
 rsreset
 def C_3 rb
 def C#3 rb
@@ -184,6 +106,6 @@ MACRO dn
     DEF INSTR = (\2) & $0F
     DEF FX = HIGH(\3)
     DEF FX_ARG = LOW(\3)
-    row \1 | {STEAL_FLAG} << 7, {d:INSTR}, {x:FX},{x:FX_ARG}
+    FAIL "TODO"
 ENDM
 ENDC

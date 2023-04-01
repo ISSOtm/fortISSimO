@@ -167,7 +167,8 @@ hUGE_SelectSong::
 	assert wWaveInstrs + 2 == wNoiseInstrs
 	assert wNoiseInstrs + 2 == wRoutine
 	assert wRoutine + 2 == wWaves
-	ld c, 2 + 2 + 2 + 2 + 2
+	assert wWaves + 2 == wRowCatalogHigh
+	ld c, 2 + 2 + 2 + 2 + 2 + 1
 .copyPointers
 	ld a, [de]
 	ld [hli], a
@@ -175,7 +176,7 @@ hUGE_SelectSong::
 	dec c
 	jr nz, .copyPointers
 
-	assert wWaves + 2 == wOrderIdx
+	assert wRowCatalogHigh + 1 == wOrderIdx
 IF DEF(PREVIEW_MODE)
 	; The tracker writes the starting order, but `wForceRow` will cause it to increase.
 	assert wOrderIdx == current_order
@@ -326,9 +327,6 @@ ENDC
 	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 	and PATTERN_LENGTH - 1
 	ld b, a
-	add a, a
-	add a, b
-	ld b, a
 	; Reset the "force row" byte.
 	assert wPatternIdx + 1 == wForceRow
 	xor a
@@ -433,10 +431,6 @@ TickSubpattern:
 	assert wCH1.lengthBit - 1 == wCH1.subPatternRow
 	runtime_assert TickSubpattern, [@hl] < 32, "Subpattern row index out of bounds! (\{[@hl]\})"
 	ld a, [hld]
-	; One row is 3 bytes long.
-	ld e, a
-	add a, a
-	add a, e
 	ld e, a
 	assert wCH1.subPatternRow - 2 == wCH1.subPattern ; 16-bit variable.
 	; Add the row offset to the subpattern base pointer.
@@ -453,11 +447,17 @@ TickSubpattern:
 	adc a, d
 	sub l
 	ld h, a
+	; Read the row's ID, and compute the pointer to it.
+	ld l, [hl]
+	ld a, [wRowCatalogHigh]
+	ld h, a
 	; Read the row's FX parameter.
-	ld a, [hli]
+	ld a, [hl]
 	ldh [hUGE_FxParam], a
+	inc h
 	runtime_assert TickSubpattern, [(([@hl] & $0F) * 2 + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
-	ld a, [hli] ; Read the jump target and FX ID.
+	ld a, [hl] ; Read the jump target and FX ID.
+	inc h
 	ld l, [hl] ; Read the note offset.
 	ld h, a ; We'll need to persist this for a bit.
 
@@ -595,15 +595,20 @@ ReadRow:
 	adc a, 0
 	ld d, a
 	ld e, c
+	; Read the row's ID, and compute the pointer to the actual row.
+	ld a, [de]
+	ld e, a
+	ld a, [wRowCatalogHigh]
+	ld d, a
 	; Read the row into the channel's data.
 	ld a, [de]
 	ld [hli], a
-	inc de
+	inc d
 	assert wCH1.fxParams + 1 == wCH1.instrAndFX
 	ld a, [de]
 	ld [hli], a
 	ld c, a
-	inc de
+	inc d
 	assert wCH1.instrAndFX + 1 == wCH1.note
 	ld a, [de]
 	runtime_assert ReadRow, a < {d:LAST_NOTE} || a == {d:___}, "Invalid note ID \{a,#\}"
@@ -1733,6 +1738,8 @@ wNoiseInstrs: dw
 wRoutine: dw
 
 wWaves: dw
+
+wRowCatalogHigh: db
 
 ; Global variables.
 

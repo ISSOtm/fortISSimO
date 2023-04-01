@@ -215,26 +215,26 @@ pub enum Note {
     ASharp8,
     B_8,
     #[default]
-    None,
+    None = 90,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum EffectId {
     #[default]
-    Arpeggio,
-    PortaUp,
-    PortaDown,
-    TonePorta,
-    Vibrato,
-    SetMasterVol,
-    CallRoutine,
-    NoteDelay,
-    SetPanning,
-    ChangeTimbre,
-    VolSlide,
-    PosJump,
-    SetVol,
-    PatternBreak,
-    NoteCut,
-    SetTempo,
+    Arpeggio = 0x0,
+    PortaUp = 0x1,
+    PortaDown = 0x2,
+    TonePorta = 0x3,
+    Vibrato = 0x4,
+    SetMasterVol = 0x5,
+    CallRoutine = 0x6,
+    NoteDelay = 0x7,
+    SetPanning = 0x8,
+    ChangeTimbre = 0x9,
+    VolSlide = 0xA,
+    PosJump = 0xB,
+    SetVol = 0xC,
+    PatternBreak = 0xD,
+    NoteCut = 0xE,
+    SetTempo = 0xF,
 }
