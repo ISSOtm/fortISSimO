@@ -503,8 +503,8 @@ fn mark_reachable_pattern_rows(
 
         // Go to the next row, or follow the overrides if any are set.
         if let Some(order) = next_order {
-            row_index = next_row.unwrap_or(0);
-            order_idx = order;
+            row_index = next_row.map_or(0, |row: usize| row - 1);
+            order_idx = order - 1;
         } else {
             row_index += 1;
             if row_index == 64 {
