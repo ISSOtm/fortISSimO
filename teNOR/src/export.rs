@@ -43,9 +43,17 @@ pub(super) fn export(
         input_path.display(),
         Utc::now().trunc_subsecs(0),
     );
-    output!("; Song: {}", song.name);
-    output!("; Artist: {}", song.artist);
-    output!("; Comment: {}", song.comment);
+    for (mut header, string) in [
+        ("Song:", &song.name),
+        ("Artist:", &song.artist),
+        ("Comment:", &song.comment),
+    ] {
+        let header_len = header.len();
+        for line in string.split('\n') {
+            output!("; {header:<header_len$} {line}");
+            header = "";
+        }
+    }
     if let Some(divider) = song.timer_divider {
         output!("; Expected playback method: TMA = ${:02x}", divider);
     } else {
