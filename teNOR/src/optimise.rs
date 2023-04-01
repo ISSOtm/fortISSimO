@@ -687,6 +687,13 @@ fn find_pattern_overlap(
             .enumerate()
             .filter(|(_, cell)| cell.can_overlap_with(first_row))
         {
+            // Ensure that the `zip` below always ends from `last_pattern`, and NOT `to_append`.
+            // TODO: once "inner overlap" is done (see the TODO at the call to `find_pattern_overlap`),
+            //       then this should always hold, and we can turn it into a `(debug_)assert`.
+            if last_pattern.len() - start_idx > to_append.len() {
+                continue;
+            }
+
             // We already checked the first row, so we can offset the rest of the iterators a bit.
             if last_pattern[start_idx + 1..]
                 .iter()
