@@ -731,6 +731,7 @@ FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
 	ret
 .ch3
 	ld a, b
+	swap a ; TODO: optimise this at compile time
 	call LoadWave.waveInA
 	; We now need to retrigger the channel, since we had to stop it to reload the wave.
 	ld hl, wCH3.period + 1
