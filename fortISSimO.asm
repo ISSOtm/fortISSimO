@@ -881,8 +881,9 @@ FxPosJump:
 	inc hl
 	assert wOrderIdx + 2 == wForceRow
 	assert LOW(-PATTERN_LENGTH) == $C0 ; Set the corresponding bits.
-	set 7, [hl]
-	set 6, [hl]
+	ld a, [hl]
+	or $C0
+	ld [hl], a
 	ret
 
 
