@@ -189,7 +189,7 @@ pub(super) fn export(
             panic!("Non-duty instrument in duty instr bank!?");
         };
 
-        output!("; Duty instrument {}: {}", id, instr.name);
+        output!(":; Duty instrument {}: {}", id, instr.name);
         output!(
             "\tdb {} << 4 | {} | {} ; Sweep (NR10)",
             sweep_time,
@@ -220,6 +220,10 @@ pub(super) fn export(
             "\tdb $80 | {} << 6 ; Retrigger bit, and length enable (NRx4)",
             instr.length.is_some() as u8,
         );
+        output!(
+            "assert DUTY_INSTR_SIZE == {size} && @ - :- == {size}",
+            size = instr.kind.data_size()
+        );
     }
     output!();
 
@@ -231,7 +235,7 @@ pub(super) fn export(
             panic!("Non-wave instrument in wave instr bank!?");
         };
 
-        output!("; Wave instrument {}: {}", id, instr.name);
+        output!(":; Wave instrument {}: {}", id, instr.name);
         output!("\tdb {} ; Length (NR31)", decode_len(instr),);
         output!("\tdb {output_level} ; Output level (NR32)");
         output!(
@@ -249,6 +253,10 @@ pub(super) fn export(
             "\tdb {} << 4 ; Wave ID",
             wave_usage.get_remapped_id(waveform.into())
         );
+        output!(
+            "assert WAVE_INSTR_SIZE == {size} && @ - :- == {size}",
+            size = instr.kind.data_size()
+        );
     }
     output!();
 
@@ -265,7 +273,7 @@ pub(super) fn export(
             panic!("Non-noise instrument in noise instr bank!?");
         };
 
-        output!("; Noise instrument {}: {}", id, instr.name);
+        output!(":; Noise instrument {}: {}", id, instr.name);
         output!(
             "\tdb {} ; Volume & envelope (NR42)",
             NRx2 {
@@ -286,6 +294,10 @@ pub(super) fn export(
             lfsr_width,
             instr.length.is_some() as u8,
             decode_len(instr),
+        );
+        output!(
+            "assert NOISE_INSTR_SIZE == {size} && @ - :- == {size}",
+            size = instr.kind.data_size()
         );
     }
     output!();

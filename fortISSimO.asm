@@ -1394,7 +1394,7 @@ PlayDutyNote:
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
 	; Pulse instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
-	; TODO: assert that this is the case!
+	assert DUTY_INSTR_SIZE == 6
 	rra ; *8 now.
 	rra ; *4 now.
 	ld d, a
@@ -1495,7 +1495,7 @@ PlayWaveNote:
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
 	; Wave instruments are 6 bytes each, and we currently have the index times 16; scale it down a bit.
-	; TODO: assert that this is the case!
+	assert WAVE_INSTR_SIZE == 6
 	rra ; *8 now.
 	rra ; *4 now.
 	ld e, a

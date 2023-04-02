@@ -6,6 +6,10 @@ def PATTERN_LENGTH equ 64 ; How many rows in a pattern.
 def ROW_SIZE equ 3 ; How many bytes per row.
 def ORDER_WIDTH equ 2 ; How many bytes in each order entry.
 
+def DUTY_INSTR_SIZE equ 6
+def WAVE_INSTR_SIZE equ 6
+def NOISE_INSTR_SIZE equ 4
+
 rsreset
 def C_3 rb
 def C#3 rb
