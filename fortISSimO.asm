@@ -638,7 +638,7 @@ ReadRow:
 
 
 ; @param e: The ID of the wave to load.
-; @destroy hl a
+; @destroy hl e a
 LoadWave:
 	; Compute a pointer to the wave.
 	ld a, e
@@ -652,16 +652,29 @@ LoadWave:
 	adc a, h
 	sub l
 	ld h, a
+
+	IF !DEF(FORTISSIMO_CH3_KEEP)
+		; Temporarily "disconnect" CH3 while loading the wave, to mitigate the DC offset from turning the DAC off.
+		ldh a, [rNR51]
+		ld e, a
+		and ~(AUDTERM_3_LEFT | AUDTERM_3_RIGHT)
+		ldh [rNR51], a
+	ENDC
+
 	; Load the wave.
 	xor a
 	ldh [rNR30], a ; Disable CH3's DAC while loading wave RAM.
-	; TODO: should we remove CH3 from NR51 to improve GBA quality?
 	FOR OFS, 0, 16
 		ld a, [hli]
 		ldh [_AUD3WAVERAM + OFS], a
 	ENDR
 	ld a, AUD3ENA_ON
 	ldh [rNR30], a ; Re-enable CH3's DAC.
+
+	IF !DEF(FORTISSIMO_CH3_KEEP)
+		ld a, e
+		ldh [rNR51], a
+	ENDC
 	ret
 
 
