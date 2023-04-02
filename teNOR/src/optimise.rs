@@ -85,6 +85,7 @@ pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
     }
     let wave_usage = compacted_mapping_from_mask(used_waves);
     remap_waves(&mut patterns, &wave_usage.0);
+    // Instruments' waves are remapped during export.
 
     // TODO: pattern deduplication (including finding patterns "in the middle of" of others) would
     //       cut down on the number of patterns, and potentially speed up following steps.
@@ -286,6 +287,9 @@ pub struct Cell(pub CellFirstHalf, pub Effect);
 
 impl Cell {
     // TODO: add a "validation" function, and report invalid cells during export.
+    //       toneporta requires a note
+    //       pos_jump's arg must be non-zero and in-bounds
+    //       pattern break: same
 
     pub fn first_byte(&self) -> u8 {
         match self.1 {
@@ -323,7 +327,7 @@ impl Cell {
                 // This is 1-based in the tracker. Converting to `wForceRow` format requires subtracting 1.
                 (param - 1)
                 // Convert to `wForceRow` format.
-                | !PATTERN_LENGTH
+                | 0u8.wrapping_sub(PATTERN_LENGTH)
             }
 
             // Catch-all.
