@@ -631,6 +631,11 @@ impl<const N: usize> CompactedMapping<N> {
     fn nb_saved(&self) -> usize {
         N - self.1
     }
+
+    pub fn get_remapped_id(&self, original: usize) -> u8 {
+        debug_assert!(usize::from(self.0[original]) < self.1); // The new ID should be within the "compacted" range.
+        self.0[original]
+    }
 }
 
 fn remap_instrs(pattern: &mut OptimisedPattern, mapping: &[u8; 15]) {
