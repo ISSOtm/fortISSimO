@@ -579,7 +579,7 @@ TickSubpattern:
 	dw KnownRet ; No vibrato
 	dw FxSetMasterVolume
 	dw FxCallRoutine
-	dw KnownRet ; No note delay
+	dw FxFixedMode ; Repurposed note delay
 	dw FxSetPanning
 	dw FxChangeTimbre
 	dw FxVolumeSlide
@@ -688,11 +688,13 @@ LoadWave:
 
 
 ; Starts playing a new note on the channel, writing back its period to the channel's struct.
+; The "standard" comes from CH4 encoding its frequency in a special way, whereas channels 1, 2, and 3
+; all work (mostly) the same.
 ; @param a:  ID of the note to play.
 ; @param c:  LOW(rNRx3)
 ; @param hl: Pointer to the channel's `.period`.
 ; @destroy c de hl a
-def PlayNewNote equs "PlayDutyNote.playNewNote"
+def PlayNewNoteStandard equs "PlayDutyNote.playNewNote"
 
 
 ; @param de: Pointer to the channel's FX params.
@@ -740,7 +742,7 @@ MACRO To
 	ENDC
 ENDM
 
-; First, FX code that only runs on tick 0.
+; FX code that only runs on tick 0.
 
 FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
 .ch1
@@ -1024,7 +1026,7 @@ FxArpeggio:
 	; Play this note.
 	ld hl, wCH1.period - wCH1.note
 	add hl, de
-	jp PlayNewNote
+	jp PlayNewNoteStandard
 
 
 ; This is here so that its `jr`s can reach their targets.
@@ -1376,6 +1378,24 @@ FxTonePorta2:
 	ret
 
 
+FxFixedMode:
+	runtime_assert FxFixedMode, @b < {LAST_NOTE}, "Fixed mode param must not be higher than {LAST_NOTE}!"
+	bit 3, c
+	ld a, b
+	jp nz, PlayNoiseNote.setFreq
+	ld hl, wCH1.period - wCH1.note
+	add hl, de
+	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
+	ld a, c	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
+	xor $11  ; 10, 13, 15
+	add a, c ; 11, 15, 19
+	cp LOW(rNR23)
+	adc a, c ; 13, 18, 1D
+	ld c, a
+	ld a, b
+	jr PlayNewNoteStandard
+
+
 ; Used by `FxNoteDelay`, hoisted out to save some space in the web of `jr`s that is FX code.
 ; @param c:  The channel's bit mask in the muted/allowed channel bytes.
 ; @param d:  The note's ID.
@@ -1466,7 +1486,7 @@ PlayDutyNote:
 
 	; Next, apply the note.
 	pop af ; Retrieve the note ID (from d to a).
-	;; NOTE: aliased as `PlayNewNote`; if modifying this, please check the documentation accordingly.
+	;; NOTE: aliased as `PlayNewNoteStandard`; if modifying this, please check the documentation accordingly.
 	; (An alias is used to keep `.noInstr` below as a local label.)
 .playNewNote
 	; Compute a pointer to the note's period.
@@ -1643,6 +1663,7 @@ PlayNoiseNote:
 
 	; Next, apply the note.
 	ld a, d
+.setFreq
 	call GetNoisePolynom
 	ld hl, wCH4.polynom
 	ld [hld], a

@@ -27,3 +27,10 @@ On a row that contains the tone portamento effect *and* an instrument ID, hUGEDr
 The "set speed" effect is not supported in subpatterns.
 
 Additionally, fortISSimO fixes a bug in hUGEDriver where any jumps to row #31 (`J32` in the tracker) would be ignored.
+
+## "Absolute" subpatterns
+
+fortISSimO's subpatterns allow temporarily overriding the current note!
+This is done with effect `7` (normally "note delay", unavailable in subpatterns); the parameter indicates which note shall be used on that row (the lower the argument, the lower the pitch).
+
+Note that using this effect overrides everything on the tick that it's active.
