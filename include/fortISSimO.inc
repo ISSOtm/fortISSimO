@@ -106,6 +106,46 @@ MACRO dn
     DEF INSTR = (\2) & $0F
     DEF FX = HIGH(\3)
     DEF FX_ARG = LOW(\3)
-    FAIL "TODO"
+
+    IF !DEF(Catalog)
+        ; First call, set the base addresses.
+        PUSHS
+        SECTION FRAGMENT "Row first bytes", ROMX[$7D00]
+            Catalog:: ; Needs to be accessed by fO.
+        SECTION FRAGMENT "Row second bytes", ROMX[Catalog + 256]
+        SECTION FRAGMENT "Row third bytes", ROMX[Catalog + 256 * 2]
+        POPS
+    ENDC
+
+    IF FX == FX_POS_JUMP
+        DEF FIRST_BYTE = (FX_ARG - 1 - 1) * 2
+    ELIF FX == FX_SET_VOLUME
+        DEF FIRST_BYTE = (FX_ARG >> 4) | (FX_ARG & $0F) << 4
+        ; If we're going to set the envelope, avoid killing the channel.
+        IF FIRST_BYTE & $0F != 0 && FIRST_BYTE & $F8 == 0
+            DEF FIRST_BYTE = $08
+        ENDC
+    ELIF FX == FX_PATTERN_BRK
+        DEF FIRST_BYTE = (FX_ARG - 1) | -PATTERN_LENGTH
+    ELSE
+        DEF FIRST_BYTE = FX_ARG
+    ENDC
+    DEF SECOND_BYTE = INSTR << 4 | FX
+    DEF THIRD_BYTE = STEAL_FLAG << 7 | (\1)
+
+    DEF LABEL equs "Row_{X:FIRST_BYTE}_{X:SECOND_BYTE}_{X:THIRD_BYTE}"
+    IF !DEF({LABEL}) ; Only emit each row once.
+        PUSHS
+        SECTION FRAGMENT "Row first bytes", ROMX
+        {LABEL}:
+            db FIRST_BYTE
+        SECTION FRAGMENT "Row second bytes", ROMX
+            db SECOND_BYTE
+        SECTION FRAGMENT "Row third bytes", ROMX
+            db THIRD_BYTE
+        POPS
+    ENDC
+        db LABEL - Catalog
+    PURGE LABEL
 ENDM
 ENDC

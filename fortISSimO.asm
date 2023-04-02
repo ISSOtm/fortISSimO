@@ -49,7 +49,6 @@ IF !DEF(HUGETRACKER)
 ELSE ; The above files are accessed differently when inside hUGETracker.
 	INCLUDE "include/hardware.inc"
 	INCLUDE "include/hUGE.inc"
-	PURGE row ; Otherwise we have a conflict later, lol.
 ENDC
 
 
@@ -296,17 +295,18 @@ hUGE_TickSound::
 	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 	ld a, -PATTERN_LENGTH ; pow2 is required to be able to mask off these two bits.
 .forceRow
-	ld [hl], a
+	ld [hld], a
 IF DEF(PREVIEW_MODE)
 	jr nz, .incRequired ; Everything that sets `wForceRow` expects the order to advance.
+	inc hl
 	; If looping is enabled, don't switch patterns.
 	ld a, [loop_order]
 	and a
 	jr nz, .samePattern
+	dec hl
 .incRequired
 ENDC
 	; Switch to next patterns.
-	dec hl
 	assert wPatternIdx - 1 == wOrderIdx
 	ld a, [wLastPatternIdx]
 	sub [hl]
@@ -459,6 +459,9 @@ TickSubpattern:
 	ld a, [hl] ; Read the jump target and FX ID.
 	inc h
 	ld l, [hl] ; Read the note offset.
+	IF DEF(HUGETRACKER)
+		rlc l ; We can't store the offset pre-rotated because hT uses a single `dn` macro.
+	ENDC
 	ld h, a ; We'll need to persist this for a bit.
 
 	; Update the index to point to the next row.
@@ -472,6 +475,15 @@ TickSubpattern:
 	inc de
 	inc de
 	inc de
+	IF DEF(HUGETRACKER) ; We don't normally do this, because it introduces an overflow bug.
+		jr nz, .jump
+		ld a, [de]
+		inc a
+		and 32 - 1 ; Subpatterns wrap around.
+		db $FE ; Swallow up next byte.
+	.jump
+		dec a
+	ENDC
 	ld [de], a
 
 	; Apply the note offset, if any.
@@ -1834,22 +1846,13 @@ IF DEF(HUGETRACKER)
 		SECTION "Converted data", WRAM0
 		wConvertedNoiseInstrs: ds 15 * 4
 		wConvertedWaveInstrs: ds 15 * 6
-		wConvertedDutyInstrs: ds 15 * 6
 		wConvertedHeader:
 			.tempo: db
 			.maxIndex: db
 			.instrPtrs: ds 2 * 3
 			.routine: dw
 			.waves: dw
-
-		; This is too big for WRAM0 when WRAMX exists, so we have to split this.
-		; Eugh ><
-		SECTION "Converted subpatterns pt.1", WRAM0[$D000 - 2 * 15 * 32 * 3]
-		wConvertedSubpatterns: ds 2 * 15 * 32 * 3
-			assert @ == $D000
-		SECTION "Converted subpatterns pt.2", WRAMX[$D000]
-			ds 1 * 15 * 32 * 3
-		wConvertedSubpatternsPtr: dw
+			.rowCatalogHigh: db
 	POPS
 
 	; hUGETracker generates a different "track header", which must be translated so that fO can understand it.
@@ -1887,8 +1890,13 @@ IF DEF(HUGETRACKER)
 		dec c
 		jr nz, .saveOrderPtr
 
-		; All instrument data needs to be converted, as the subpattern row format is different in hD and fO.
-		REPT 3
+		; Duty instruments have the same format, so we can simply point at their table.
+		ld a, [hli]
+		ld [wConvertedHeader.instrPtrs], a
+		ld a, [hli]
+		ld [wConvertedHeader.instrPtrs + 1], a
+		; All other instrument data needs to be converted, as the subpattern row format is different in hD and fO.
+		REPT 2
 			ld a, [hli]
 			ld e, a
 			ld a, [hli]
@@ -1904,30 +1912,38 @@ IF DEF(HUGETRACKER)
 		ld a, HIGH(KnownRet)
 		ld [wConvertedHeader.routine + 1], a
 
-		; And finally, the waves.
+		; The waves.
 		ld a, [hli]
 		ld [wConvertedHeader.waves], a
 		ld a, [hli]
 		ld [wConvertedHeader.waves + 1], a
 
-		; Convert the instruments.
+		; And finally, the row catalog.
+		ld a, HIGH(Catalog)
+		ld [wConvertedHeader.rowCatalogHigh], a
 
-		ld a, LOW(wConvertedSubpatterns)
-		ld [wConvertedSubpatternsPtr], a
-		ld a, HIGH(wConvertedSubpatterns)
-		ld [wConvertedSubpatternsPtr + 1], a
+		; Convert the instruments.
 
 		pop de
 		ld hl, wConvertedNoiseInstrs
 		ld c, 15
 	.convertNoiseInstr
-		ld a, [de] ; Volume & envelope.
+		; Volume & envelope.
+		ld a, [de]
 		inc de
 		ld [hli], a
-		call .convertSubpattern
-		ld a, [de] ; A bunch of flags.
+		; Subpattern pointer.
+		ld a, [de]
 		inc de
 		ld [hli], a
+		ld a, [de]
+		inc de
+		ld [hli], a
+		; A bunch of flags.
+		ld a, [de]
+		inc de
+		ld [hli], a
+		; Skip padding.
 		inc de
 		inc de
 		dec c
@@ -1954,13 +1970,19 @@ IF DEF(HUGETRACKER)
 		inc de
 		push af
 		; Subpattern pointer.
-		call .convertSubpattern
+		ld a, [de]
+		inc de
+		ld [hli], a
+		ld a, [de]
+		inc de
+		ld [hli], a
 		; Retrigger bit and length enable.
 		ld a, [de]
 		inc de
 		ld [hli], a
 		; Write the wave ID.
 		pop af
+		swap a ; Multiply by the wave's length.
 		ld [hli], a
 		dec c
 		jr nz, .convertWaveInstr
@@ -1968,35 +1990,6 @@ IF DEF(HUGETRACKER)
 		ld [wConvertedHeader.instrPtrs + 2], a
 		ld a, HIGH(wConvertedWaveInstrs)
 		ld [wConvertedHeader.instrPtrs + 2 + 1], a
-
-		pop de
-		ld hl, wConvertedDutyInstrs
-		ld c, 15
-	.convertDutyInstr
-		; Sweep.
-		ld a, [de]
-		inc de
-		ld [hli], a
-		; Duty & length.
-		ld a, [de]
-		inc de
-		ld [hli], a
-		; Volume & envelope.
-		ld a, [de]
-		inc de
-		ld [hli], a
-		; Subpattern pointer.
-		call .convertSubpattern
-		; Retrigger bit and length enable.
-		ld a, [de]
-		inc de
-		ld [hli], a
-		dec c
-		jr nz, .convertDutyInstr
-		ld a, LOW(wConvertedDutyInstrs)
-		ld [wConvertedHeader.instrPtrs], a
-		ld a, HIGH(wConvertedDutyInstrs)
-		ld [wConvertedHeader.instrPtrs + 1], a
 
 		; And now, load this converted header!
 		ld de, wConvertedHeader
@@ -2009,87 +2002,6 @@ IF DEF(HUGETRACKER)
 			ld a, d
 			ld [wCH{d:N}.order + 1], a
 		ENDR
-		ret
-
-
-	.convertSubpattern
-		; Write the pointer to the subpattern we're about to write.
-		ld a, [wConvertedSubpatternsPtr]
-		ld [hli], a
-		ld a, [wConvertedSubpatternsPtr + 1]
-		ld [hli], a
-		push hl ; Save the write pointer for the caller.
-
-		; Get the read pointer.
-		ld a, [de]
-		inc de
-		ld l, a
-		ld a, [de]
-		inc de
-		ld h, a
-		or l
-		jr z, .emptySubpattern
-		push de ; Save the read pointer for the caller.
-		; Read the "pattern pool" pointer we'll write to.
-		ld a, [wConvertedSubpatternsPtr]
-		ld e, a
-		ld a, [wConvertedSubpatternsPtr + 1]
-		ld d, a
-
-		ld b, 32
-	.convertRow
-		ld a, [hli] ; FX arg.
-		ld [de], a
-		inc de
-
-		inc hl
-		ld a, [hld] ; Note & 5th jump bit (bit 4).
-		and $80 ; Only keep the jump bit.
-		rlca ; Move it to bit 0.
-		xor [hl]
-		and $0F
-		xor [hl]
-		; We got the jump target, which needs translating.
-		jr nz, .notDefaultTarget
-		ld a, 33
-		sub b
-		and $1F
-	.notDefaultTarget
-		swap a
-		push af ; Save it for actually writing the note.
-		xor [hl]
-		and $F0
-		xor [hl]
-		ld [de], a
-		inc de
-		inc hl
-
-		pop af ; Get back the jump target.
-		rra ; Push bit 4 (now in bit 0) into carry.
-		ld a, [hli] ; Read note & 5th jump bit again.
-		rla ; Discard original jump bit, shift in new one, and position the note correctly.
-		ld [de], a
-		inc de
-
-		dec b
-		jr nz, .convertRow
-
-		; Write back the "pattern pool" pointer.
-		ld a, e
-		ld [wConvertedSubpatternsPtr], a
-		ld a, d
-		ld [wConvertedSubpatternsPtr + 1], a
-		pop de
-		pop hl
-		ret
-
-	.emptySubpattern
-		pop hl
-		dec hl
-		dec hl
-		xor a
-		ld [hli], a
-		ld [hli], a
 		ret
 ENDC
 
@@ -2143,6 +2055,7 @@ IF DEF(PREVIEW_MODE)
 	loop_order: db ; If non-zero, instead of falling through to the next pattern, loop the current one.
 
 ELIF DEF(HUGETRACKER)
+	_hUGE_dosound::
 	hUGE_dosound::
 		jp hUGE_TickSound
 ENDC

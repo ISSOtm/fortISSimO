@@ -311,7 +311,7 @@ impl Cell {
             } => {
                 match (param >> 4, param & 0x0F) {
                     // This would kill the channel; only mute it, but keep the DAC active.
-                    (envelope, 0) if envelope != 0 => 0x08,
+                    (envelope @ 1.., 0) if envelope & 8 == 0 => 0x08,
                     // Swap the nibbles to match NRx2 order.
                     (envelope, volume) => volume << 4 | envelope,
                 }
