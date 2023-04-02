@@ -5,7 +5,6 @@ version = "1.0.0" # Make sure to update the version in `fortISSimO.asm` accordin
 edition = "2021"
 repository = "https://github.com/ISSOtm/fortISSimO"
 license = "MPL-2.0"
-license-file = "./LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
