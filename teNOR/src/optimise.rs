@@ -460,7 +460,7 @@ fn mark_reachable_pattern_rows(
                 Effect {
                     id: EffectId::PosJump,
                     param,
-                } => next_order = Some(param.into()),
+                } => next_order = Some((param - 1).into()),
                 // CH3's `9` effect references waves; use the time to mark one if relevant.
                 Effect {
                     id: EffectId::ChangeTimbre,
@@ -508,7 +508,7 @@ fn mark_reachable_pattern_rows(
         // Go to the next row, or follow the overrides if any are set.
         if let Some(order) = next_order {
             row_index = next_row.map_or(0, |row: usize| row - 1);
-            order_idx = order - 1;
+            order_idx = order;
         } else {
             row_index += 1;
             if row_index == 64 {
