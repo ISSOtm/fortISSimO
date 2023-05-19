@@ -508,13 +508,16 @@ TickSubpattern:
 	; For the FX dispatch below, we need the FX ID (in `h`) and the channel mask (in `c`).
 	ld l, c
 	push hl
+	push de
+	ld hl, wCH1.period - wCH1.note
+	add hl, de
 	; Compute the note's period.
 	add a, a
 	add a, LOW(PeriodTable)
-	ld l, a
+	ld e, a
 	adc a, HIGH(PeriodTable)
-	sub l
-	ld h, a
+	sub e
+	ld d, a
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	ld a, c ; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
@@ -523,12 +526,16 @@ TickSubpattern:
 	adc a, c ; 13, 18, 1D
 	ld c, a
 	; Write the period, together with the length bit.
-	ld a, [hli]
+	ld a, [de]
+	ld [hli], a
 	ldh [c], a
 	inc c
-	ld a, [hl]
+	inc de
+	ld a, [de]
+	ld [hl], a
 	or b ; Add the length bit.
 	ldh [c], a
+	pop de ; Restore the pointer to the channel's note ID (for FX).
 	pop bc ; Retore the FX ID and the channel mask.
 .appliedOffset
 
@@ -553,11 +560,13 @@ TickSubpattern:
 .ch4
 	call GetNoisePolynom
 	ld d, a
+	ld [wCH4.polynom], a
 	ld a, [wCH4.lfsrWidth]
 	or d
 	ldh [rNR43], a
 	ld a, b
 	ldh [rNR44], a
+	ld de, wCH4.note ; Restore the pointer to the channel's note ID (for FX).
 .noNoteOffset
 	ld b, h ; Transfer the FX ID for the calling code.
 	jr .appliedOffset
