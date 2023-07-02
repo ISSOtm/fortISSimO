@@ -4,9 +4,9 @@ A speed- and size-focused Game Boy music driver, intended for use with [hUGETrac
 
 **Do you want to use fortISSimO? Then please read [the manual](https://eldred.fr/fortISSimO)!**
 
-A table [comparing pros and cons of many GB music drivers](https://github.com/ISSOtm/fortISSimO/wiki/Drivers-comparison) is also available on the wiki.
+For an **example of usage**, as well as something to **quickly & easily make a ROM out of your song**, see [fortISSimO-demo](https://github.com/ISSOtm/fortISSimO-demo).
 
-For an example of usage or something to make a ROM out of your song, see [fortISSimO-demo](https://github.com/ISSOtm/fortISSimO-demo).
+A table [comparing pros and cons of many GB music drivers](https://github.com/ISSOtm/fortISSimO/wiki/Drivers-comparison) is also available on the wiki.
 
 ## License
 
