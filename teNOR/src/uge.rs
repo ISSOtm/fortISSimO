@@ -168,8 +168,11 @@ fn instrument_v3(input: &[u8]) -> PResult<Instrument<'_>> {
         let (input, kind) = nom::number::complete::le_u32(input)?;
         let (input, name) = short_string(input)?;
         let (new_input, length) = integer(input)?;
-        if length >= 64 {
-            return Err(InnerError::err(input, InnerErrorKind::BadLength(length)));
+        if length >= 255 {
+            return Err(InnerError::err(
+                input,
+                InnerErrorKind::TooManyInstrs(length),
+            ));
         }
         let length = unsafe { NonZeroU8::new_unchecked(length as u8 + 1) };
         let (input, length_enabled) = boolean(new_input)?;
@@ -486,7 +489,6 @@ enum InnerErrorKind {
     BadBool(u8),
     BadTimerDivider(u32),
     BadInstrType(u32),
-    BadLength(u32),
     BadEnvDir(u32),
     BadSweepDir(u32),
     BadDutyType(u8),
@@ -499,6 +501,7 @@ enum InnerErrorKind {
     BadWave(u8),
     OrderNotMatrix(usize, usize, usize, usize),
     NumOutOfRange(TryFromIntError),
+    TooManyInstrs(u32),
     Context(&'static str),
     Nom(nom::error::ErrorKind),
 }
@@ -509,7 +512,6 @@ impl Display for InnerErrorKind {
             Self::BadBool(n) => write!(f, "Boolean out of range (0x{n:08x})"),
             Self::BadTimerDivider(n) => write!(f, "Timer divider out of range (0x{n:08x})"),
             Self::BadInstrType(n) => write!(f, "Instrument type out of range (0x{n:08x})"),
-            Self::BadLength(n) => write!(f, "Length out of range ({n:08x})"),
             Self::BadEnvDir(n) => write!(f, "Envelope direction out of range (0x{n:08x})"),
             Self::BadSweepDir(n) => write!(f, "Sweep direction out of range (0x{n:08x})"),
             Self::BadDutyType(n) => write!(f, "Duty type out of range (0x{n:08x})"),
@@ -525,6 +527,7 @@ impl Display for InnerErrorKind {
                 "Length of order \"columns\" don't match! ({ch1}, {ch2}, {ch3}, {ch4})"
             ),
             Self::NumOutOfRange(err) => write!(f, "Number out of range: {err}"),
+            Self::TooManyInstrs(n) => write!(f, "Too many instruments (0x{n:08x})"),
             Self::Context(ctx) => f.write_str(ctx),
             Self::Nom(err) => write!(f, "Error in parser \"{}\"", err.description()),
         }
