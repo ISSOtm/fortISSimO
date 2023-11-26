@@ -118,8 +118,35 @@ fn song_v6(input: &[u8]) -> PResult<Song<'_>> {
 fn instr_collection_v3(input: &[u8]) -> PResult<InstrCollection<'_>> {
     fn inner(input: &[u8]) -> PResult<InstrCollection<'_>> {
         let (input, duty) = instr_bank_v3(input)?;
+        if cfg!(debug_assertions) {
+            if let Some((i, instr)) = duty
+                .iter()
+                .enumerate()
+                .find(|(_i, instr)| !matches!(instr.kind, InstrumentKind::Square { .. }))
+            {
+                panic!("Wrong kind for duty instr #{i}! ({:?})", instr.kind);
+            }
+        }
         let (input, wave) = instr_bank_v3(input)?;
+        if cfg!(debug_assertions) {
+            if let Some((i, instr)) = duty
+                .iter()
+                .enumerate()
+                .find(|(_i, instr)| !matches!(instr.kind, InstrumentKind::Wave { .. }))
+            {
+                panic!("Wrong kind for wave instr #{i}! ({:?})", instr.kind);
+            }
+        }
         let (input, noise) = instr_bank_v3(input)?;
+        if cfg!(debug_assertions) {
+            if let Some((i, instr)) = duty
+                .iter()
+                .enumerate()
+                .find(|(_i, instr)| !matches!(instr.kind, InstrumentKind::Noise { .. }))
+            {
+                panic!("Wrong kind for noise instr #{i}! ({:?})", instr.kind);
+            }
+        }
 
         Ok((input, InstrCollection { duty, wave, noise }))
     }
