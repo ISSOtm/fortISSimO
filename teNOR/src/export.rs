@@ -167,10 +167,7 @@ pub(super) fn export(
     output!();
 
     fn decode_len(instr: &Instrument) -> u8 {
-        match instr.length {
-            Some(len) => u8::from(len) - 1,
-            None => 0,
-        }
+        instr.length.unwrap_or(0)
     }
 
     output!(".dutyInstrs");
@@ -185,7 +182,8 @@ pub(super) fn export(
             sweep_dir,
             sweep_shift,
             duty,
-        } = &instr.kind else {
+        } = &instr.kind
+        else {
             panic!("Non-duty instrument in duty instr bank!?");
         };
 
@@ -231,7 +229,11 @@ pub(super) fn export(
     for id in wave_instr_usage.iter() {
         let instr = &song.instruments.wave[usize::from(id)];
         let id = id + 1;
-        let &InstrumentKind::Wave { output_level, wave_id: waveform } = &instr.kind else {
+        let &InstrumentKind::Wave {
+            output_level,
+            wave_id: waveform,
+        } = &instr.kind
+        else {
             panic!("Non-wave instrument in wave instr bank!?");
         };
 
@@ -269,7 +271,8 @@ pub(super) fn export(
             envelope_dir,
             envelope_pace,
             lfsr_width,
-        } = &instr.kind else {
+        } = &instr.kind
+        else {
             panic!("Non-noise instrument in noise instr bank!?");
         };
 

@@ -167,14 +167,7 @@ fn instrument_v3(input: &[u8]) -> PResult<Instrument<'_>> {
         let kind_input = input;
         let (input, kind) = nom::number::complete::le_u32(input)?;
         let (input, name) = short_string(input)?;
-        let (new_input, length) = integer(input)?;
-        if length >= 255 {
-            return Err(InnerError::err(
-                input,
-                InnerErrorKind::TooManyInstrs(length),
-            ));
-        }
-        let length = unsafe { NonZeroU8::new_unchecked(length as u8 + 1) };
+        let (new_input, length) = try_convert(input, integer)?;
         let (input, length_enabled) = boolean(new_input)?;
         let (input, initial_volume) = nom::number::complete::u8(input)?;
         let (input, envelope_dir) = try_convert(input, nom::number::complete::le_u32)?;
@@ -501,7 +494,6 @@ enum InnerErrorKind {
     BadWave(u8),
     OrderNotMatrix(usize, usize, usize, usize),
     NumOutOfRange(TryFromIntError),
-    TooManyInstrs(u32),
     Context(&'static str),
     Nom(nom::error::ErrorKind),
 }
@@ -527,7 +519,6 @@ impl Display for InnerErrorKind {
                 "Length of order \"columns\" don't match! ({ch1}, {ch2}, {ch3}, {ch4})"
             ),
             Self::NumOutOfRange(err) => write!(f, "Number out of range: {err}"),
-            Self::TooManyInstrs(n) => write!(f, "Too many instruments (0x{n:08x})"),
             Self::Context(ctx) => f.write_str(ctx),
             Self::Nom(err) => write!(f, "Error in parser \"{}\"", err.description()),
         }

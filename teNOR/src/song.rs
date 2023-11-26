@@ -30,7 +30,7 @@ pub type InstrumentBank<'input> = [Instrument<'input>; 15];
 #[derive(Debug, Clone, Default)]
 pub struct Instrument<'input> {
     pub name: Cow<'input, str>,
-    pub length: Option<NonZeroU8>,
+    pub length: Option<u8>,
     pub kind: InstrumentKind,
     pub subpattern: Option<Subpattern>,
 }
