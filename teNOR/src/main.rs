@@ -1,4 +1,10 @@
-use std::{ffi::OsString, fmt::Display, io::Write, path::Path, process::exit};
+use std::{
+    ffi::OsString,
+    fmt::Display,
+    io::{IsTerminal, Write},
+    path::Path,
+    process::exit,
+};
 
 use clap::{Parser, ValueEnum};
 use termcolor::{Color, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
@@ -59,7 +65,7 @@ fn main() {
     let args = CliArgs::parse();
     let color_choice = match args.color {
         CliColorChoice::Always => termcolor::ColorChoice::Always,
-        CliColorChoice::Auto if atty::is(atty::Stream::Stderr) => termcolor::ColorChoice::Auto,
+        CliColorChoice::Auto if std::io::stderr().is_terminal() => termcolor::ColorChoice::Auto,
         CliColorChoice::Auto => termcolor::ColorChoice::Never,
         CliColorChoice::Never => termcolor::ColorChoice::Never,
     };

@@ -5,12 +5,11 @@ version = "1.0.1" # Make sure to update the version in `fortISSimO.asm` accordin
 edition = "2021"
 repository = "https://github.com/ISSOtm/fortISSimO"
 license = "MPL-2.0"
-rust-version = "1.67.1"
+rust-version = "1.70.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-atty = "0.2.14"
 chrono = { version = "0.4.24", default-features = false, features = ["clock"] }
 clap = { version = "4.1.8", features = ["derive", "cargo", "wrap_help"] }
 nom = "7.1.3"
