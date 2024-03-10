@@ -55,8 +55,20 @@ ENDC
 	rev_Check_hardware_inc 4.2
 
 
+IF DEF(override)
+	PURGE override
+ENDC
+MACRO override ; Ensures that fO's symbols don't conflict with pre-defined ones.
+	REPT _NARG
+		IF DEF(\1)
+			PURGE \1
+		ENDC
+		shift
+	ENDR
+ENDM
 IF DEF(PRINT_DEBUGFILE)
 	PRINTLN "@debugfile 1.0.0"
+	override dbg_action, runtime_assert, unreachable ; Pre-defined ones, if any, may have different semantics.
 	MACRO dbg_action ; <function>, <action:str> [, <condition:dbg_expr>]
 		DEF OFS_FROM_BASE equ @ - \1
 		DEF ACTION_COND equs ""
@@ -83,6 +95,7 @@ IF DEF(PRINT_DEBUGFILE)
 		PURGE MSG
 	ENDM
 ELSE
+	override runtime_assert, unreachable
 	DEF runtime_assert equs ";"
 	DEF unreachable equs ";"
 ENDC
@@ -725,6 +738,7 @@ RunTick0Fx:
 ; @param b:  The FX's parameters.
 ; @destroy a bc de hl (potentially)
 
+	override No, To
 MACRO No ; For "empty" entries in the JR tables.
 	ret
 	ds 1
@@ -1808,6 +1822,7 @@ wPatternIdx: db ; Index into the current patterns, with the two high bits set.
 wForceRow: db ; If non-zero, will be written (verbatim) to `patternIdx` on the next tick 0, bypassing the increment.
 
 ; Individual channels.
+	override channel
 MACRO channel
 	; Pointer to the channel's order; never changes mid-song.
 	; (Part of the "song cache", in a way, but per-channel.)
@@ -2106,6 +2121,7 @@ ELIF DEF(HUGETRACKER)
 ENDC
 
 
+	override print_pair, print_stats
 MACRO print_pair
 	PRINTLN STRFMT("%s -> %s = %d", "\1", "\2", \2 - From\1To\2)
 ENDM
