@@ -13,7 +13,7 @@
 IF DEF(HUGETRACKER)
 	WARN "\n\tPlease report this issue to fortISSimO, *NOT* hUGETracker!\n\t(Even if it seems unrelated.)\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<\n"
 	IF !STRCMP("{HUGETRACKER}", "1.0b10")
-	ELIF !STRCMP("{HUGETRACKER}", "1.0")
+	ELIF !STRCMP(STRSUB("{HUGETRACKER}", 1, 3), "1.0")
 	ELSE
 		FAIL "Unsupported hUGETracker version \"{HUGETRACKER}\"!"
 	ENDC
