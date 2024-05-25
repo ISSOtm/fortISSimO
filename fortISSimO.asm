@@ -901,9 +901,8 @@ FxVolumeSlide:
 	add hl, de ; Go to the period's high byte
 	ldh a, [c]
 	xor [hl]
-	and AUDHIGH_LENGTH_ON ; Preserve that bit.
+	and AUDHIGH_LENGTH_ON | AUDHIGH_RESTART ; Preserve the length bit, and set the "restart" bit (always reads 1).
 	xor [hl]
-	or AUDHIGH_RESTART ; Retrigger the channel.
 	ldh [c], a
 	ret
 
