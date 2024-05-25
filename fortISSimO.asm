@@ -1009,11 +1009,11 @@ FxArpeggio:
 	ld a, b
 	and a
 	ret z
-	runtime_assert FxArpeggio, a != $08, "Arpeggio is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
+	runtime_assert FxArpeggio, a != $08, "Arpeggio is not supported on CH4!"
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
