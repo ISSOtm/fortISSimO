@@ -1664,13 +1664,13 @@ PlayNoiseNote:
 	ldh [rNR41], a
 	; What follows is a somewhat complicated dance that saves 1 cycle over loading from [hl] then
 	; ANDing the desired bit twice. Totally worth it, if only because it looks cool af.
-	xor [hl] ; Only keep the other two bits (bits 7 and 6).
-	rlca ; LFSR width is in bit 0 and carry now.
-	srl a ; LFSR width is in carry, and a contains only the length enable in bit 6.
-	set 7, a ; Set trigger bit.
+	xor [hl] ; Only keep the other two bits (bits 7 and 6, LFSR width and length enable respectively).
+	rlca ; Now, LFSR width is in bit 0 and carry, and length enable in bit 7.
+	scf
+	rra ; Now, LFSR width is in carry, length enable in bit 6, and bit 7 (the retrigger flag) is set.
 	ld [wCH4.lengthBit], a
-	sbc a, a ; All bits are LFSR width now.
-	and AUD4POLY_7STEP
+	sbc a, a ; This "broadcasts" the LFSR width to all bits of A.
+	and AUD4POLY_7STEP ; Only keep a single one of those, though.
 	ld [wCH4.lfsrWidth], a
 .noNoiseInstr
 
