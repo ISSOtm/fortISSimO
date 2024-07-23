@@ -1,11 +1,7 @@
 //! This module is entirely concerned with deserialising `.uge` files.
 //! The type definitions are extracted from `hugedatatypes.pas` and `song.pas`.
 
-use std::{
-    borrow::Cow,
-    fmt::Display,
-    num::{NonZeroU8, TryFromIntError},
-};
+use std::{borrow::Cow, fmt::Display, num::TryFromIntError};
 
 use nom::{
     bytes::complete::take,
@@ -337,8 +333,6 @@ impl RawCell {
     ) -> Result<Self, InnerErrorKind> {
         if instrument >= 16 {
             Err(InnerErrorKind::BadInstrument(instrument))
-        } else if jump_index >= 32 {
-            Err(InnerErrorKind::BadJumpIndex(jump_index))
         } else {
             Ok(Self {
                 note,
@@ -489,7 +483,6 @@ enum InnerErrorKind {
     BadLfsrWidth(u32),
     BadNote(u32),
     BadInstrument(u8),
-    BadJumpIndex(u8),
     BadEffectId(u32),
     BadWave(u8),
     OrderNotMatrix(usize, usize, usize, usize),
@@ -511,7 +504,6 @@ impl Display for InnerErrorKind {
             Self::BadLfsrWidth(n) => write!(f, "LFSR width out of range (0x{n:08x})"),
             Self::BadNote(n) => write!(f, "Note out of range (0x{n:08x})"),
             Self::BadInstrument(n) => write!(f, "Instrument out of range (0x{n:02x}))"),
-            Self::BadJumpIndex(n) => write!(f, "Bad jump index (0x{n:02x})"),
             Self::BadEffectId(n) => write!(f, "Effect ID out of range (0x{n:08x})"),
             Self::BadWave(raw) => write!(f, "Wave sample out of range (0x{raw:02x})"),
             Self::OrderNotMatrix(ch1, ch2, ch3, ch4) => write!(
@@ -637,7 +629,8 @@ impl TryConstrain<crate::song::PatternCell> for RawCell {
 impl TryConstrain<crate::song::SubpatternCell> for RawCell {
     fn try_constrain(self) -> Result<crate::song::SubpatternCell, InnerErrorKind> {
         let offset = self.note;
-        let next_row_idx = self.jump_index;
+        // hUGETracker clamps an index greater than 32 as that.
+        let next_row_idx = self.jump_index.min(32);
         let effect_code = self.effect_code;
         let effect_param = self.effect_params;
         Ok(crate::song::SubpatternCell {

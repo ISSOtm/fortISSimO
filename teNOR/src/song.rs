@@ -1,4 +1,4 @@
-use std::{borrow::Cow, num::NonZeroU8};
+use std::borrow::Cow;
 
 #[derive(Debug, Clone)]
 pub struct Song<'input> {
