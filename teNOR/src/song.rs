@@ -15,6 +15,7 @@ pub struct Song<'input> {
 
     pub patterns: Vec<Pattern>,
     pub order_matrix: Vec<[usize; 4]>,
+    #[allow(dead_code)]
     pub routines: RoutineBank<'input>,
 }
 
