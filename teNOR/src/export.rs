@@ -137,25 +137,22 @@ pub(super) fn export(
     }
     output!();
     output!();
-    output!(".cellCatalog  align 8");
+    output!(
+        "\tds align[8]
+.cellCatalog"
+    );
     write!(output, "\tdb ").unwrap();
     for cell in cell_catalog.keys() {
         write!(output, "${:02x},", cell.first_byte()).unwrap();
     }
     output!();
-    output!(
-        "\tds {} ; Padding to maintain alignment",
-        256 - cell_catalog.len()
-    );
+    output!("\tds align[8]");
     write!(output, "\tdb ").unwrap();
     for cell in cell_catalog.keys() {
         write!(output, "${:02x},", cell.second_byte()).unwrap();
     }
     output!();
-    output!(
-        "\tds {} ; Padding to maintain alignment",
-        256 - cell_catalog.len()
-    );
+    output!("\tds align[8]");
     write!(output, "\tdb ").unwrap();
     for cell in cell_catalog.keys() {
         write!(output, "${:02x},", cell.third_byte()).unwrap();
