@@ -117,35 +117,31 @@ hUGE_SelectSong::
 	; Kill channels that aren't muted.
 	; Note that we re-enable the channels right after, to avoid pops when they come back online.
 	ldh a, [hUGE_MutedChannels]
+	ld hl, rNR12
+	ld bc, AUDENV_UP ; B = 0
 	rra
-	ld c, a
 	jr c, .ch1NotOurs
-	xor a
-	ldh [rNR12], a
-	ld a, AUDENV_UP
-	ldh [rNR12], a
+	ld [hl], b
+	ld [hl], c
 .ch1NotOurs
-	rr c
+	rra
 	jr c, .ch2NotOurs
-	xor a
-	ldh [rNR22], a
-	ld a, AUDENV_UP
-	ldh [rNR22], a
+	ld l,rNR22 & $FF
+	ld [hl], b
+	ld [hl], c
 .ch2NotOurs
-	rr c
+	rra
 	jr c, .ch3NotOurs
-	ld hl, rNR30
+	ld l, rNR30 & $FF
 	ld [hl], l ; This has bit 7 reset.
 	ld [hl], h ; This has bit 7 set.
 .ch3NotOurs
-	rr c
+	rra
 	jr c, .ch4NotOurs
-	xor a
-	ldh [rNR42], a
-	ld a, AUDENV_UP
-	ldh [rNR42], a
+	ld l,rNR42 & $FF
+	ld [hl], b
+	ld [hl], c
 .ch4NotOurs
-
 	ld hl, hUGE_LoadedWaveID
 	ld a, hUGE_NO_WAVE
 	ld [hli], a
