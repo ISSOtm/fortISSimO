@@ -126,19 +126,19 @@ hUGE_SelectSong::
 .ch1NotOurs
 	rra
 	jr c, .ch2NotOurs
-	ld l,rNR22 & $FF
+	ld l, LOW(rNR22)
 	ld [hl], b
 	ld [hl], c
 .ch2NotOurs
 	rra
 	jr c, .ch3NotOurs
-	ld l, rNR30 & $FF
+	ld l, LOW(rNR30)
 	ld [hl], l ; This has bit 7 reset.
 	ld [hl], h ; This has bit 7 set.
 .ch3NotOurs
 	rra
 	jr c, .ch4NotOurs
-	ld l,rNR42 & $FF
+	ld l, LOW(rNR42)
 	ld [hl], b
 	ld [hl], c
 .ch4NotOurs
