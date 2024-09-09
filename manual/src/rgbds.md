@@ -16,7 +16,7 @@ Here comes `hUGE_SelectSong`!
 This function simply needs to be called with [the song's label](./teNOR.md#song-descriptor) in `de` ([example](https://github.com/ISSOtm/fortISSimO-demo/blob/5463719e48580cc835d7459d607ee30056f51de8/src/main.asm#L97-L98)).
 
 This function's relationship with the APU is as follows:
-- This function does not touch [`NR52`], so you must turn the APU on yourself (typically as part of the global init above, see [this example](ttps://github.com/ISSOtm/fortISSimO-demo/blob/5463719e48580cc835d7459d607ee30056f51de8/src/main.asm#L21)).
+- This function does not touch [`NR52`], so you must turn the APU on yourself (typically as part of the global init above, see [this example](https://github.com/ISSOtm/fortISSimO-demo/blob/5463719e48580cc835d7459d607ee30056f51de8/src/main.asm#L21)).
 - This function does not touch [`NR51`] or [`NR50`] either; if your songs make use of panning, they should include `8xx` and/or `5xx` effects on their first row to reset those registers.
 
   Keep in mind that `8xx` and `5xx` are global, and thus affect sound effects as well!
