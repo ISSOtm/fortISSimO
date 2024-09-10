@@ -13,7 +13,7 @@ The ideal time to initialise those is right after booting ([example](https://git
 ## Selecting a track
 
 Here comes `hUGE_SelectSong`!
-This function simply needs to be called with [the song's label](./teNOR.md#song-descriptor) in `de` ([example](https://github.com/ISSOtm/fortISSimO-demo/blob/5463719e48580cc835d7459d607ee30056f51de8/src/main.asm#L97-L98)).
+This function simply needs to be called with [the song's label](./teNOR.md#song-descriptor) in `de` ([example](https://github.com/ISSOtm/fortISSimO-demo/blob/d9a93b5460ee36fe0d18b5b9a061b7ba93b02549/src/main.asm#L97-L98)).
 
 This function's relationship with the APU is as follows:
 - This function does not touch [`NR52`], so you must turn the APU on yourself (typically as part of the global init above, see [this example](https://github.com/ISSOtm/fortISSimO-demo/blob/5463719e48580cc835d7459d607ee30056f51de8/src/main.asm#L21)).
