@@ -55,8 +55,20 @@ impl<const N: usize> CompactedMapping<N> {
 
 pub(super) fn remap_instrs(pattern: &mut OptimisedPattern, mapping: &[u8; 15]) {
     for cell in &mut pattern.0 {
-        let AnnotatedCell { reachable: true, cell } = cell else { continue; }; // Don't bother with unreachable cells.
-        let CellFirstHalf::Pattern { note: _ , instrument } = &mut cell.0 else { unreachable!(); };
+        let AnnotatedCell {
+            reachable: true,
+            cell,
+        } = cell
+        else {
+            continue;
+        }; // Don't bother with unreachable cells.
+        let CellFirstHalf::Pattern {
+            note: _,
+            instrument,
+        } = &mut cell.0
+        else {
+            unreachable!();
+        };
         // ID 0 means "no instrument", and that doesn't change.
         if *instrument != 0 {
             // Actual instruments are 1-indexed.
@@ -72,7 +84,13 @@ pub(super) fn remap_waves(patterns: &mut HashMap<PatternId, OptimisedPattern>, m
             PatternId::Pattern(InstrKind::Wave, _) | PatternId::Subpattern(InstrKind::Wave, _)
         ) {
             for cell in &mut pattern.0 {
-                let AnnotatedCell { reachable: true, cell } = cell else { continue; };
+                let AnnotatedCell {
+                    reachable: true,
+                    cell,
+                } = cell
+                else {
+                    continue;
+                };
                 if let Effect {
                     id: EffectId::ChangeTimbre,
                     param,

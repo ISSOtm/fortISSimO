@@ -163,7 +163,10 @@ impl<'builder, 'patterns: 'builder> Iterator for RowsIter<'builder, 'patterns> {
                 &self.builder.ordering[self.ordering_idx..]
             {
                 // Patterns are sorted by their "start row index"; if we overshoot, so will all subsequent iterations.
-                let Some(ovlpg_pattern_ofs) = self.row_idx.checked_sub(ovlpg_pattern_row_idx) else { break; };
+                let Some(ovlpg_pattern_ofs) = self.row_idx.checked_sub(ovlpg_pattern_row_idx)
+                else {
+                    break;
+                };
 
                 let ovlpg_row = &self.builder.patterns[&ovlpg_pattern_id].0[ovlpg_pattern_ofs];
                 // I found you, faker!

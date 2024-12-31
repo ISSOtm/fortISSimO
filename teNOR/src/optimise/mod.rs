@@ -50,7 +50,9 @@ pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
     );
 
     for (id, subpattern) in &mut patterns {
-        let PatternId::Subpattern(..) = id else { continue; };
+        let PatternId::Subpattern(..) = id else {
+            continue;
+        };
         mark_reachable_subpattern_rows(*id, subpattern, &mut used_waves);
     }
 
@@ -69,7 +71,9 @@ pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
     let wave_instr_usage = compacted_mapping_from_mask(used_wave_instrs);
     let noise_instr_usage = compacted_mapping_from_mask(used_noise_instrs);
     for (id, pattern) in &mut patterns {
-        let PatternId::Pattern(kind, _) = id else { continue; };
+        let PatternId::Pattern(kind, _) = id else {
+            continue;
+        };
         remap_instrs(
             pattern,
             &match kind {
@@ -87,7 +91,13 @@ pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
         if used_wave_instrs & 1 << i == 0 {
             continue; // Ignore unused instruments.
         }
-        let InstrumentKind::Wave { output_level: _, wave_id } = instr.kind else { unreachable!(); };
+        let InstrumentKind::Wave {
+            output_level: _,
+            wave_id,
+        } = instr.kind
+        else {
+            unreachable!();
+        };
         used_waves |= 1 << wave_id;
     }
     let wave_usage = compacted_mapping_from_mask(used_waves);
@@ -104,7 +114,9 @@ pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
     let mut pattern_usage = vec![0u8; (song.patterns.len() + 7) / 8];
     let mut duplicated_patterns = 0; // Innocent until proven guilty.
     for id in patterns.keys() {
-        let PatternId::Pattern(_, index) = id else { continue; };
+        let PatternId::Pattern(_, index) = id else {
+            continue;
+        };
         let byte = &mut pattern_usage[index / 8];
         let mask = 1 << (index % 8);
         if *byte & mask == 0 {

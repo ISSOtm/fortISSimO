@@ -90,7 +90,13 @@ pub(super) fn mark_reachable_pattern_rows(
 
             // Mark the corresponding instrument as reachable, too.
             // (Bit 0 is unused, since it marks "no instrument".)
-            let CellFirstHalf::Pattern { note: _, instrument } = cell.cell.0 else { unreachable!(); };
+            let CellFirstHalf::Pattern {
+                note: _,
+                instrument,
+            } = cell.cell.0
+            else {
+                unreachable!();
+            };
             *match i {
                 0 | 1 => &mut used_duty_instrs,
                 2 => &mut used_wave_instrs,
@@ -165,7 +171,9 @@ pub(super) fn trim_trailing_unreachable_rows(
     let keys: Vec<_> = patterns.keys().cloned().collect();
 
     for key in keys.iter().cloned() {
-        let std::collections::hash_map::Entry::Occupied(mut entry) = patterns.entry(key) else { unreachable!(); };
+        let std::collections::hash_map::Entry::Occupied(mut entry) = patterns.entry(key) else {
+            unreachable!();
+        };
 
         let pattern = &mut entry.get_mut().0;
         match pattern
