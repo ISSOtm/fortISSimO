@@ -125,7 +125,7 @@ fn instr_collection_v3(input: &[u8]) -> PResult<InstrCollection<'_>> {
         }
         let (input, wave) = instr_bank_v3(input)?;
         if cfg!(debug_assertions) {
-            if let Some((i, instr)) = duty
+            if let Some((i, instr)) = wave
                 .iter()
                 .enumerate()
                 .find(|(_i, instr)| !matches!(instr.kind, InstrumentKind::Wave { .. }))
@@ -135,7 +135,7 @@ fn instr_collection_v3(input: &[u8]) -> PResult<InstrCollection<'_>> {
         }
         let (input, noise) = instr_bank_v3(input)?;
         if cfg!(debug_assertions) {
-            if let Some((i, instr)) = duty
+            if let Some((i, instr)) = noise
                 .iter()
                 .enumerate()
                 .find(|(_i, instr)| !matches!(instr.kind, InstrumentKind::Noise { .. }))
