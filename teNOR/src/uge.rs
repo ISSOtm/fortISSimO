@@ -59,7 +59,7 @@ impl Display for ParseError<'_> {
         match &self.0 {
             ParseErrorKind::NotUge => write!(f, "This is too short to be a UGE file"),
             ParseErrorKind::UnsupportedVersion(n) => write!(f, "UGE version {n} is not supported; please open and save this in hUGETracker to upgrade it"),
-            ParseErrorKind::TooNew(n) => write!(f, "UGE version {n} is not supported; please pester someone to update this tool!"),
+            ParseErrorKind::TooNew(n) => write!(f, "UGE version {n} is not supported; please pester someone to update teNOR!"),
             ParseErrorKind::BadData { input, inner: InnerError(errors) } => (|| {
                 writeln!(f, "There was an error parsing the UGE file!")?;
                 let base_ptr = input.as_ptr();

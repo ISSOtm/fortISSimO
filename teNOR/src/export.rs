@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fmt::Display,
     fs::File,
     io::{StdoutLock, Write},
@@ -11,7 +10,7 @@ use chrono::prelude::*;
 use clap::{crate_name, crate_version};
 
 use crate::{
-    optimise::{Cell, InstrKind, OptimResults, OutputCell, PatternId},
+    optimise::{CellCatalog, InstrKind, OptimResults, OutputCell, PatternId},
     song::{
         DutyType, EnvelopeDirection, Instrument, InstrumentKind, LfsrWidth, Song, Subpattern,
         SweepDirection, WaveOutputLevel,
@@ -109,7 +108,7 @@ pub(super) fn export(
     }
     output!();
 
-    let mut emit_patterns = |cell_catalog: &HashMap<Cell, u8>, row_pool: &[_], label_name| {
+    let mut emit_patterns = |cell_catalog: &CellCatalog, row_pool: &[_], label_name| {
         let mut reverse_lookup = [0; 256];
         for (i, id) in cell_catalog.values().enumerate() {
             reverse_lookup[usize::from(*id)] = i as u8;

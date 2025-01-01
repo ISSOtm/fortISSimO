@@ -1,10 +1,12 @@
-use std::{collections::HashMap, iter::FusedIterator, num::Wrapping};
+use std::{iter::FusedIterator, num::Wrapping};
 
-use super::{AnnotatedCell, Cell, OptimisedPattern, OutputCell, PatternId};
+use crate::optimise::CellCatalog;
+
+use super::{AnnotatedCell, OutputCell, PatternId, PatternStore};
 
 // This algorithm is described in the README.
 pub(super) fn find_pattern_overlap(
-    patterns: &HashMap<PatternId, OptimisedPattern>,
+    patterns: &PatternStore,
 ) -> (RowPoolBuilder<'_>, RowPoolBuilder<'_>, usize) {
     // A hashmap's keys are not guaranteed to be returned in a consistent order, so collect them to ensure that.
     let mut main_pattern_ids = Vec::with_capacity(patterns.len());
@@ -17,7 +19,7 @@ pub(super) fn find_pattern_overlap(
     }
 
     fn find_overlap_in_group<'patterns>(
-        patterns: &'patterns HashMap<PatternId, OptimisedPattern>,
+        patterns: &'patterns PatternStore,
         pattern_ids: &[PatternId],
     ) -> (RowPoolBuilder<'patterns>, usize) {
         let nb_patterns = pattern_ids.len();
@@ -75,17 +77,14 @@ impl AnnotatedCell {
 
 #[derive(Debug, Clone)]
 pub(super) struct RowPoolBuilder<'patterns> {
-    patterns: &'patterns HashMap<PatternId, OptimisedPattern>,
+    patterns: &'patterns PatternStore,
     // Vector of (pattern id, how many rows into pool before its start)
     ordering: Vec<(PatternId, usize)>,
     score: usize,
 }
 
 impl<'patterns> RowPoolBuilder<'patterns> {
-    fn new(
-        patterns: &'patterns HashMap<PatternId, OptimisedPattern>,
-        initial_pattern_id: PatternId,
-    ) -> Self {
+    fn new(patterns: &'patterns PatternStore, initial_pattern_id: PatternId) -> Self {
         let mut ordering = Vec::with_capacity(patterns.len());
         ordering.push((initial_pattern_id, 0));
         Self {
@@ -173,22 +172,24 @@ impl<'builder, 'patterns: 'builder> Iterator for RowsIter<'builder, 'patterns> {
         let mut row = &pattern.0[pattern_ofs];
         if !row.reachable {
             // If this row is not reachable, try providing a row overlapping with it that is reachable.
-            // For brevity, "overlapping" in the below variables will be shortened to "ovlpg".
+            // For brevity, "overlapping" in the below variables will be shortened to "overlapping".
             // TODO: rewrite this using iterators, and compare. Discuss with nyanpasu.
-            for &(ovlpg_pattern_id, ovlpg_pattern_row_idx) in
+            for &(overlapping_pattern_id, overlapping_pattern_row_idx) in
                 &self.builder.ordering[self.ordering_idx..]
             {
                 // Patterns are sorted by their "start row index"; if we overshoot, so will all subsequent iterations.
-                let Some(ovlpg_pattern_ofs) = self.row_idx.checked_sub(ovlpg_pattern_row_idx)
+                let Some(overlapping_pattern_ofs) =
+                    self.row_idx.checked_sub(overlapping_pattern_row_idx)
                 else {
                     break;
                 };
 
-                let ovlpg_row = &self.builder.patterns[&ovlpg_pattern_id].0[ovlpg_pattern_ofs];
+                let overlapping_row =
+                    &self.builder.patterns[&overlapping_pattern_id].0[overlapping_pattern_ofs];
                 // I found you, faker!
-                if ovlpg_row.reachable {
+                if overlapping_row.reachable {
                     // Faker? You're not even good enough to be my fake.
-                    row = ovlpg_row;
+                    row = overlapping_row;
                     break;
                 }
             }
@@ -222,9 +223,9 @@ pub(super) fn generate_row_pool(
         ordering,
         score: _,
     }: RowPoolBuilder,
-) -> (Vec<OutputCell>, HashMap<Cell, u8>, isize) {
+) -> (Vec<OutputCell>, CellCatalog, isize) {
     let mut output = Vec::new();
-    let mut cell_catalog = HashMap::new();
+    let mut cell_catalog = CellCatalog::new();
     let mut next_id = Wrapping(0); // An ID overflow will trigger an error in a later stage; for now, just ensure that we get there without panicking.
     let mut nb_saved_bytes = 0;
 

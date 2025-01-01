@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     ffi::OsString,
     fmt::Display,
     io::{IsTerminal, Write},
@@ -8,6 +7,7 @@ use std::{
 };
 
 use clap::{Parser, ValueEnum};
+use optimise::CellCatalog;
 use termcolor::{Color, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
 
 mod export;
@@ -108,7 +108,7 @@ fn main() {
 
     let (optim_results, optim_stats) = optimise::optimise(&song);
 
-    let mut check = |catalog: &HashMap<_, _>, name| {
+    let mut check = |catalog: &CellCatalog, name| {
         if let nb_unique_cells @ 257.. = catalog.len() {
             write_error!("The song has {nb_unique_cells} unique cells in {name}, the max is 256!\n" ; "There is not much that can be done, sorry. Try simplifying it?");
             exit(1);
