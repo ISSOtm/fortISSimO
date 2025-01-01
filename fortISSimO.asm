@@ -58,46 +58,75 @@ ENDC
 IF DEF(override)
 	PURGE override
 ENDC
-MACRO override ; Ensures that fO's symbols don't conflict with pre-defined ones.
-	REPT _NARG
-		IF DEF(\1)
-			PURGE \1
-		ENDC
-		shift
-	ENDR
-ENDM
 IF DEF(PRINT_DEBUGFILE)
 	PRINTLN "@debugfile 1.0.0"
-	override dbg_action, runtime_assert, unreachable ; Pre-defined ones, if any, may have different semantics.
-	MACRO dbg_action ; <function>, <action:str> [, <condition:dbg_expr>]
-		DEF OFS_FROM_BASE equ @ - \1
+
+	MACRO override ; Ensures that fO's symbols don't conflict with pre-defined ones.
+		REPT _NARG
+			IF DEF(\1)
+				PURGE \1
+			ENDC
+			shift
+		ENDR
+	ENDM
+	override dbg_var, dbg_action, dbg_log, runtime_assert, unreachable ; Pre-defined ones, if any, may have different semantics.
+
+	MACRO dbg_var ; <name>, <default value>
+	    DEF DEFAULT_VALUE equs "0"
+	    IF _NARG > 1
+	        redef DEFAULT_VALUE equs "\2"
+	    ENDC
+	    PRINTLN "@var \1 {DEFAULT_VALUE}"
+	    PURGE DEFAULT_VALUE
+	ENDM
+
+	MACRO dbg_action ; <action:str> [, <condition:dbg_expr>]
+		DEF OFS_FROM_BASE equ @ - {.}
 		DEF ACTION_COND equs ""
-		IF _NARG > 2
-			REDEF ACTION_COND equs "\3"
+		IF _NARG > 1
+			REDEF ACTION_COND equs "\2"
 		ENDC
-		PRINTLN "\1+{d:OFS_FROM_BASE} x {ACTION_COND}: ", \2
+		PRINTLN "{.}+{d:OFS_FROM_BASE} x {ACTION_COND}: ", \1
 		PURGE OFS_FROM_BASE, ACTION_COND
 	ENDM
-	MACRO runtime_assert ; <function>, <condition:dbg_expr> [, <message:dbg_str>]
-		DEF MSG equs "assert failure"
-		IF _NARG > 2
-			REDEF MSG equs \3
-		ENDC
-		dbg_action \1, "alert \"{MSG}\"", !(\2)
+
+	MACRO dbg_log ; <message:dbg_str> [, <condition:dbg_expr>]
+		DEF MSG equs \1
+		SHIFT
+		dbg_action "message \"{MSG}\"", \#
 		PURGE MSG
 	ENDM
-	MACRO unreachable ; <function> [, <message:dbg_str>]
-		DEF MSG equs "unreachable code reached!"
+
+	MACRO runtime_assert ; <condition:dbg_expr> [, <message:dbg_str>]
+		DEF MSG equs "assert failure"
 		IF _NARG > 1
 			REDEF MSG equs \2
 		ENDC
-		dbg_action \1, "alert \"In \1: {MSG}\""
+		dbg_action "alert \"{MSG}\"", !(\1)
 		PURGE MSG
 	ENDM
-ELSE
-	override runtime_assert, unreachable
-	DEF runtime_assert equs ";"
-	DEF unreachable equs ";"
+
+	MACRO unreachable ; [<message:dbg_str>]
+		DEF MSG equs "unreachable code reached!"
+		IF _NARG > 0
+			REDEF MSG equs \1
+		ENDC
+		dbg_action "alert \"In {.}: {MSG}\""
+		PURGE MSG
+	ENDM
+
+ELSE ; If not printing debugfiles to stdout, define the macros as do-nothing.
+	MACRO override
+		redef def_empty equs "MACRO \\1\nENDM"
+		REPT _NARG
+			IF DEF(\1)
+				PURGE \1
+			ENDC
+			def_empty
+			shift
+		ENDR
+	ENDM
+	override dbg_var, dbg_action, dbg_log, runtime_assert, unreachable
 ENDC
 
 
@@ -438,7 +467,7 @@ TickSubpattern:
 	ld a, [hld] ; Read the length bit.
 	ld b, a
 	assert wCH1.lengthBit - 1 == wCH1.subPatternRow
-	runtime_assert TickSubpattern, [@hl] < 32, "Subpattern row index out of bounds! (\{[@hl]\})"
+	runtime_assert [@hl] < 32, "Subpattern row index out of bounds! (\{[@hl]\})"
 	ld a, [hld]
 	ld e, a
 	assert wCH1.subPatternRow - 2 == wCH1.subPattern ; 16-bit variable.
@@ -464,7 +493,7 @@ TickSubpattern:
 	ld a, [hl]
 	ldh [hUGE_FxParam], a
 	inc h
-	runtime_assert TickSubpattern, [(([@hl] & $0F) * 2 + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
+	runtime_assert [(([@hl] & $0F) * 2 + TickSubpattern.fxPointers)!] != KnownRet, "Bad command (\{[@hl],$\}) in subpattern!"
 	ld a, [hl] ; Read the jump target and FX ID.
 	inc h
 	ld l, [hl] ; Read the note offset.
@@ -510,7 +539,7 @@ TickSubpattern:
 	ld a, [de]
 	add a, l
 	sub LAST_NOTE / 2 ; Go from "unsigned range" to "signed range".
-	runtime_assert TickSubpattern, @a < {LAST_NOTE}, "Subpattern offset over/underflowed note ID! \{@a\}"
+	runtime_assert @a < {LAST_NOTE}, "Subpattern offset over/underflowed note ID! \{@a\}"
 	bit 3, c
 	assert hUGE_CH4_MASK == 1 << 3
 	jr nz, .ch4
@@ -641,7 +670,7 @@ ReadRow:
 	inc d
 	assert wCH1.instrAndFX + 1 == wCH1.note
 	ld a, [de]
-	runtime_assert ReadRow, a < {d:LAST_NOTE} || a == {d:___}, "Invalid note ID \{a,#\}"
+	runtime_assert a < {d:LAST_NOTE} || a == {d:___}, "Invalid note ID \{a,#\}"
 	ld d, a
 	; If the row is a rest, don't play it.
 	cp ___
@@ -779,7 +808,7 @@ FxChangeTimbre2: ; These are jumped to by `FxChangeTimbre` below.
 
 
 FxTonePortaSetup:
-	runtime_assert FxTonePortaSetup, c != $08, "Tone porta is not supported on CH4!"
+	runtime_assert c != $08, "Tone porta is not supported on CH4!"
 	; Setup portion: get the target period.
 	ld a, [de]
 	; Compute the target period from the note ID.
@@ -819,7 +848,7 @@ FxChangeTimbre:
 	jr c, FxChangeTimbre2.ch3
 .ch4
 	; Keep the polynom bits, but replace the LFSR width bit.
-	runtime_assert FxChangeTimbre, (b == 0) || (b == {AUD4POLY_7STEP}), "Invalid argument to FxChangeTimbre for CH4!"
+	runtime_assert (b == 0) || (b == {AUD4POLY_7STEP}), "Invalid argument to FxChangeTimbre for CH4!"
 	ldh a, [rNR43]
 	and ~AUD4POLY_7STEP ; Reset the LFSR width bit.
 	or b
@@ -849,7 +878,7 @@ FxPatternBreak:
 
 
 FxVolumeSlide:
-	runtime_assert FxVolumeSlide, a != $04, "Volume slide is not supported for CH3!"
+	runtime_assert a != $04, "Volume slide is not supported for CH3!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
@@ -1009,7 +1038,7 @@ FxArpeggio:
 	ldh a, [hUGE_AllowedChannels]
 	and c
 	ret z
-	runtime_assert FxArpeggio, a != $08, "Arpeggio is not supported on CH4!"
+	runtime_assert a != $08, "Arpeggio is not supported on CH4!"
 	; Compute the pointer to NRx3, bit twiddling courtesy of @calc84maniac.
 	; a = 1 (CH1), 2 (CH2), or 4 (CH3).
 	xor $11  ; 10, 13, 15
@@ -1075,7 +1104,7 @@ NoteCutTick0Trampoline:
 ; And these FX are "continuous" only.
 
 FxPortaUp:
-	runtime_assert FxPortaUp, a != $08, "Porta up is not supported on CH4!"
+	runtime_assert a != $08, "Porta up is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
@@ -1108,7 +1137,7 @@ FxPortaUp:
 
 
 FxPortaDown:
-	runtime_assert FxPortaDown, a != $08, "Porta down is not supported on CH4!"
+	runtime_assert a != $08, "Porta down is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
@@ -1176,7 +1205,7 @@ PlayNewVib:
 	; fallthrough
 
 FxVibrato:
-	runtime_assert FxVibrato, a != $08, "Vibrato is not supported on CH4!"
+	runtime_assert a != $08, "Vibrato is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
@@ -1236,7 +1265,7 @@ FxVibrato:
 
 ; This is only half of the logic. The other half is in `FxTonePorta2`.
 FxTonePorta:
-	runtime_assert FxTonePorta, a != $08, "Tone porta is not supported on CH4!"
+	runtime_assert a != $08, "Tone porta is not supported on CH4!"
 	; Don't touch the channel if not allowed to.
 	ldh a, [hUGE_AllowedChannels]
 	and c
@@ -1388,7 +1417,7 @@ FxTonePorta2:
 
 
 FxFixedMode:
-	runtime_assert FxFixedMode, @b < {LAST_NOTE}, "Fixed mode param must not be higher than {LAST_NOTE}!"
+	runtime_assert @b < {LAST_NOTE}, "Fixed mode param must not be higher than {LAST_NOTE}!"
 	bit 3, c
 	ld a, b
 	jp nz, PlayNoiseNote.setFreq
@@ -1487,7 +1516,7 @@ PlayDutyNote:
 	ld [hli], a
 	assert wCH1.subPatternRow + 1 == wCH1.lengthBit
 	ld a, [de] ; NRx4 mask.
-	runtime_assert PlayDutyNote, @a & $80, "Instrument without trigger bit!"
+	runtime_assert @a & $80, "Instrument without trigger bit!"
 	ld [hli], a
 .skippedInstr
 	assert wCH1.lengthBit + 1 == wCH1.period
@@ -1541,7 +1570,7 @@ PlayWaveNote:
 	; First, apply the instrument.
 	ld a, [wCH3.instrAndFX]
 	and $F0 ; Keep the instrument bits.
-	runtime_assert PlayWaveNote, !@zf || [wCH3.lengthBit] & $80 == 0, "CH3 must only be retriggered on instr code path!" ; See the comment further below about killing CH3.
+	runtime_assert !@zf || [wCH3.lengthBit] & $80 == 0, "CH3 must only be retriggered on instr code path!" ; See the comment further below about killing CH3.
 	jr z, .noWaveInstr
 	; Compute the instrument pointer.
 	sub $10 ; Instrument IDs are 1-based.
@@ -1577,7 +1606,7 @@ PlayWaveNote:
 	xor a ; Subpattern row counter.
 	ld [wCH3.subPatternRow], a
 	ld a, [hli] ; NRx4 mask.
-	runtime_assert PlayWaveNote, @a & $80, "Instrument without trigger bit!"
+	runtime_assert @a & $80, "Instrument without trigger bit!"
 	ld [wCH3.lengthBit], a
 	; Check if a new wave must be loaded.
 	ld e, [hl]
@@ -1677,7 +1706,7 @@ PlayNoiseNote:
 	ld hl, wCH4.polynom
 	ld [hld], a
 	assert wCH4.polynom - 1 == wCH4.lfsrWidth
-	runtime_assert PlayNoiseNote, (a & $08) == 0, "Polynom \{@a,2$\} has bit 3 set!"
+	runtime_assert (a & $08) == 0, "Polynom \{@a,2$\} has bit 3 set!"
 	or [hl] ; The polynom's bit 3 is always reset.
 	ldh [rNR43], a
 	dec hl

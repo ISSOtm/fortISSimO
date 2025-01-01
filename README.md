@@ -8,7 +8,7 @@ For an **example of usage**, as well as something to **quickly & easily make a R
 
 A table [comparing pros and cons of many GB music drivers](https://github.com/ISSOtm/fortISSimO/wiki/Drivers-comparison) is also available on the wiki.
 
-This requires RGBDS 0.7.0 or later.
+This requires RGBDS 0.9.0 or later.
 
 ## License
 
