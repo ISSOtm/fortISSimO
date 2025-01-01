@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     ffi::OsString,
     fmt::Display,
     io::{IsTerminal, Write},
@@ -107,15 +108,23 @@ fn main() {
 
     let (optim_results, optim_stats) = optimise::optimise(&song);
 
-    if let nb_unique_cells @ 257.. = optim_results.cell_catalog.len() {
-        write_error!("The song has {nb_unique_cells} unique cells, the max is 256!\n" ; "There is not much that can be done, sorry. Try simplifying it?");
-        exit(1);
-    }
+    let mut check = |catalog: &HashMap<_, _>, name| {
+        if let nb_unique_cells @ 257.. = catalog.len() {
+            write_error!("The song has {nb_unique_cells} unique cells in {name}, the max is 256!\n" ; "There is not much that can be done, sorry. Try simplifying it?");
+            exit(1);
+        }
+    };
+    check(&optim_results.main_cell_catalog, "the main grid");
+    check(&optim_results.subpat_cell_catalog, "subpatterns");
 
     export::export(&args, &song, input_path, &optim_results);
 
     if !args.quiet {
-        print_stats(&mut stderr, &optim_stats, optim_results.cell_catalog.len());
+        print_stats(
+            &mut stderr,
+            &optim_stats,
+            optim_results.main_cell_catalog.len() + optim_results.subpat_cell_catalog.len(),
+        );
     }
 }
 

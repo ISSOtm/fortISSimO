@@ -5,49 +5,65 @@ use super::{AnnotatedCell, Cell, OptimisedPattern, OutputCell, PatternId};
 // This algorithm is described in the README.
 pub(super) fn find_pattern_overlap(
     patterns: &HashMap<PatternId, OptimisedPattern>,
-) -> (RowPoolBuilder<'_>, usize) {
+) -> (RowPoolBuilder<'_>, RowPoolBuilder<'_>, usize) {
     // A hashmap's keys are not guaranteed to be returned in a consistent order, so collect them to ensure that.
-    let pattern_ids: Vec<_> = patterns.keys().cloned().collect();
-    let nb_patterns = pattern_ids.len();
-
-    // The first iteration is really simple: just shove every pattern, and there can be no overlap.
-    // This also ensures that no ordering will ever be empty.
-    // TODO: two separate allocations? Meh...
-    let mut prev_row = vec![None; nb_patterns]; // We just need to init this somehow.
-    let mut new_row = pattern_ids
-        .iter()
-        .map(|&i| Some(RowPoolBuilder::new(patterns, i)))
-        .collect();
-
-    // Now for all the other iterations!
-    for _ in 1..nb_patterns {
-        std::mem::swap(&mut prev_row, &mut new_row); // Putting this first helps with type deduction!
-
-        for (&pattern_id, target) in pattern_ids.iter().zip(new_row.iter_mut()) {
-            *target = prev_row
-                .iter()
-                .filter_map(|maybe| maybe.as_ref()) // Ignore empty cells (and unwrap the rest).
-                .filter(|builder| !builder.contains(pattern_id)) // Reject builders that already contain the pattern.
-                .map(|builder| {
-                    let (score, start_row_idx) = builder.score_with(pattern_id);
-                    (start_row_idx, score, builder)
-                })
-                .max_by_key(|(_, score, _)| *score)
-                .map(|(start_row_idx, new_score, builder)| {
-                    let mut new_builder = builder.clone();
-                    new_builder.add(pattern_id, start_row_idx, new_score);
-                    new_builder
-                });
+    let mut main_pattern_ids = Vec::with_capacity(patterns.len());
+    let mut sub_pattern_ids = Vec::with_capacity(patterns.len());
+    for &id in patterns.keys() {
+        match id {
+            PatternId::Pattern(_, _) => main_pattern_ids.push(id),
+            PatternId::Subpattern(_, _) => sub_pattern_ids.push(id),
         }
     }
 
-    let best_builder = new_row
-        .into_iter()
-        .flatten() // Skip over empty cells.
-        .max_by_key(|builder| builder.score)
-        .expect("How come no ordering survived!?");
-    let score = best_builder.score;
-    (best_builder, score)
+    fn find_overlap_in_group<'patterns>(
+        patterns: &'patterns HashMap<PatternId, OptimisedPattern>,
+        pattern_ids: &[PatternId],
+    ) -> (RowPoolBuilder<'patterns>, usize) {
+        let nb_patterns = pattern_ids.len();
+
+        // The first iteration is really simple: just shove every pattern, and there can be no overlap.
+        // This also ensures that no ordering will ever be empty.
+        // TODO: two separate allocations? Meh...
+        let mut prev_row = vec![None; nb_patterns]; // We just need to init this somehow.
+        let mut new_row = pattern_ids
+            .iter()
+            .map(|&i| Some(RowPoolBuilder::new(patterns, i)))
+            .collect();
+
+        // Now for all the other iterations!
+        for _ in 1..nb_patterns {
+            std::mem::swap(&mut prev_row, &mut new_row); // Putting this first helps with type deduction!
+
+            for (&pattern_id, target) in pattern_ids.iter().zip(new_row.iter_mut()) {
+                *target = prev_row
+                    .iter()
+                    .filter_map(|maybe| maybe.as_ref()) // Ignore empty cells (and unwrap the rest).
+                    .filter(|builder| !builder.contains(pattern_id)) // Reject builders that already contain the pattern.
+                    .map(|builder| {
+                        let (score, start_row_idx) = builder.score_with(pattern_id);
+                        (start_row_idx, score, builder)
+                    })
+                    .max_by_key(|(_, score, _)| *score)
+                    .map(|(start_row_idx, new_score, builder)| {
+                        let mut new_builder = builder.clone();
+                        new_builder.add(pattern_id, start_row_idx, new_score);
+                        new_builder
+                    });
+            }
+        }
+
+        let best_builder = new_row
+            .into_iter()
+            .flatten() // Skip over empty cells.
+            .max_by_key(|builder| builder.score)
+            .expect("How come no ordering survived!?");
+        let score = best_builder.score;
+        (best_builder, score)
+    }
+    let (main_builder, main_score) = find_overlap_in_group(patterns, &main_pattern_ids);
+    let (sub_builder, sub_score) = find_overlap_in_group(patterns, &sub_pattern_ids);
+    (main_builder, sub_builder, main_score + sub_score)
 }
 
 impl AnnotatedCell {

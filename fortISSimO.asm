@@ -205,7 +205,8 @@ hUGE_SelectSong::
 	assert wNoiseInstrs + 2 == wRoutine
 	assert wRoutine + 2 == wWaves
 	assert wWaves + 2 == wRowCatalogHigh
-	ld c, 2 + 2 + 2 + 2 + 2 + 1
+	assert wRowCatalogHigh + 1 == wSubpatRowCatalogHigh
+	ld c, 2 + 2 + 2 + 2 + 2 + 1 + 1
 .copyPointers
 	ld a, [de]
 	ld [hli], a
@@ -213,7 +214,7 @@ hUGE_SelectSong::
 	dec c
 	jr nz, .copyPointers
 
-	assert wRowCatalogHigh + 1 == wOrderIdx
+	assert wSubpatRowCatalogHigh + 1 == wOrderIdx
 IF DEF(PREVIEW_MODE)
 	; The tracker writes the starting order, but `wForceRow` will cause it to increase.
 	assert wOrderIdx == current_order
@@ -487,7 +488,7 @@ TickSubpattern:
 	ld h, a
 	; Read the row's ID, and compute the pointer to it.
 	ld l, [hl]
-	ld a, [wRowCatalogHigh]
+	ld a, [wSubpatRowCatalogHigh]
 	ld h, a
 	IF DEF(FORTISSIMO_LOG)
 		dbg_log "CH\{c,2\} reading subpattern row from $\{hl,04$\}: (\{[hl + 512],2\}, \{[hl + 256],2$\}_\{[hl],2$\})"
@@ -1841,6 +1842,7 @@ wRoutine: dw
 wWaves: dw
 
 wRowCatalogHigh: db
+wSubpatRowCatalogHigh: db
 
 ; Global variables.
 

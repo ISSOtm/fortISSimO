@@ -106,8 +106,12 @@ pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
 
     // TODO: pattern deduplication (including finding patterns "in the middle of" of others) would
     //       cut down on the number of patterns, and potentially speed up following steps.
-    let (row_pool_builder, overlapped_rows) = find_pattern_overlap(&patterns);
-    let (row_pool, cell_map, saved_bytes_catalog) = generate_row_pool(row_pool_builder);
+    let (main_row_pool_builder, subpat_row_pool_builder, overlapped_rows) =
+        find_pattern_overlap(&patterns);
+    let (main_row_pool, main_cell_map, main_saved_bytes_catalog) =
+        generate_row_pool(main_row_pool_builder);
+    let (subpat_row_pool, subpat_cell_map, subpat_saved_bytes_catalog) =
+        generate_row_pool(subpat_row_pool_builder);
 
     // We're done! Time to compute some stats for reporting, and return our hard work!
 
@@ -155,13 +159,15 @@ pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
             &noise_instr_usage.0[noise_instr_usage.1..],
         ),
         trimmed_waves: wave_usage.nb_saved(),
-        saved_bytes_catalog,
+        saved_bytes_catalog: main_saved_bytes_catalog + subpat_saved_bytes_catalog,
     };
 
     (
         OptimResults {
-            row_pool,
-            cell_catalog: cell_map,
+            main_row_pool,
+            main_cell_catalog: main_cell_map,
+            subpat_row_pool,
+            subpat_cell_catalog: subpat_cell_map,
             duty_instr_usage,
             wave_instr_usage,
             noise_instr_usage,
@@ -173,8 +179,10 @@ pub fn optimise(song: &Song) -> (OptimResults, OptimStats) {
 
 #[derive(Debug)]
 pub struct OptimResults {
-    pub row_pool: Vec<OutputCell>,
-    pub cell_catalog: HashMap<Cell, u8>,
+    pub main_row_pool: Vec<OutputCell>,
+    pub main_cell_catalog: HashMap<Cell, u8>,
+    pub subpat_row_pool: Vec<OutputCell>,
+    pub subpat_cell_catalog: HashMap<Cell, u8>,
     pub duty_instr_usage: CompactedMapping<15>,
     pub wave_instr_usage: CompactedMapping<15>,
     pub noise_instr_usage: CompactedMapping<15>,

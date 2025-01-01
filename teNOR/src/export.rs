@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt::Display,
     fs::File,
     io::{StdoutLock, Write},
@@ -10,7 +11,7 @@ use chrono::prelude::*;
 use clap::{crate_name, crate_version};
 
 use crate::{
-    optimise::{InstrKind, OptimResults, OutputCell, PatternId},
+    optimise::{Cell, InstrKind, OptimResults, OutputCell, PatternId},
     song::{
         DutyType, EnvelopeDirection, Instrument, InstrumentKind, LfsrWidth, Song, Subpattern,
         SweepDirection, WaveOutputLevel,
@@ -23,8 +24,10 @@ pub(super) fn export(
     song: &Song,
     input_path: &Path,
     OptimResults {
-        row_pool,
-        cell_catalog,
+        main_row_pool,
+        main_cell_catalog,
+        subpat_row_pool,
+        subpat_cell_catalog,
         duty_instr_usage,
         wave_instr_usage,
         noise_instr_usage,
@@ -93,7 +96,7 @@ pub(super) fn export(
     output!("\tdw .dutyInstrs, .waveInstrs, .noiseInstrs");
     output!("\tdw .routine");
     output!("\tdw .waves");
-    output!("\tdb HIGH(.cellCatalog)");
+    output!("\tdb HIGH(.mainCellCatalog), HIGH(.subpatCellCatalog)");
     output!();
 
     for i in 0..4 {
@@ -106,58 +109,63 @@ pub(super) fn export(
     }
     output!();
 
-    let mut reverse_lookup = [0; 256];
-    for (i, id) in cell_catalog.values().enumerate() {
-        reverse_lookup[usize::from(*id)] = i as u8;
-    }
-    let mut row_idx = 0;
-    for entry in row_pool {
-        match entry {
-            OutputCell::Label(whose) => {
-                write!(output, "\n.{whose}").unwrap();
-                row_idx = 0;
-            }
-            OutputCell::Cell(id) => {
-                write!(
-                    output,
-                    "{}{:3}",
-                    if row_idx == 0 { "\n\tdb " } else { "," },
-                    reverse_lookup[usize::from(*id)]
-                )
-                .unwrap();
-                row_idx += 1;
-            }
-            OutputCell::OverlapMarker(1) => {
-                write!(output, "\n\t; Continued on next row.").unwrap();
-            }
-            OutputCell::OverlapMarker(how_many) => {
-                write!(output, "\n\t; Continued on next {how_many} rows.").unwrap();
+    let mut emit_patterns = |cell_catalog: &HashMap<Cell, u8>, row_pool: &[_], label_name| {
+        let mut reverse_lookup = [0; 256];
+        for (i, id) in cell_catalog.values().enumerate() {
+            reverse_lookup[usize::from(*id)] = i as u8;
+        }
+        let mut row_idx = 0;
+        for entry in row_pool {
+            match entry {
+                OutputCell::Label(whose) => {
+                    write!(output, "\n.{whose}").unwrap();
+                    row_idx = 0;
+                }
+                OutputCell::Cell(id) => {
+                    write!(
+                        output,
+                        "{}{:3}",
+                        if row_idx == 0 { "\n\tdb " } else { "," },
+                        reverse_lookup[usize::from(*id)]
+                    )
+                    .unwrap();
+                    row_idx += 1;
+                }
+                OutputCell::OverlapMarker(1) => {
+                    write!(output, "\n\t; Continued on next row.").unwrap();
+                }
+                OutputCell::OverlapMarker(how_many) => {
+                    write!(output, "\n\t; Continued on next {how_many} rows.").unwrap();
+                }
             }
         }
-    }
-    output!();
-    output!();
-    output!(
-        "\tds align[8]
-.cellCatalog"
-    );
-    write!(output, "\tdb ").unwrap();
-    for cell in cell_catalog.keys() {
-        write!(output, "${:02x},", cell.first_byte()).unwrap();
-    }
-    output!();
-    output!("\tds align[8]");
-    write!(output, "\tdb ").unwrap();
-    for cell in cell_catalog.keys() {
-        write!(output, "${:02x},", cell.second_byte()).unwrap();
-    }
-    output!();
-    output!("\tds align[8]");
-    write!(output, "\tdb ").unwrap();
-    for cell in cell_catalog.keys() {
-        write!(output, "${:02x},", cell.third_byte()).unwrap();
-    }
-    output!();
+        output!();
+        output!();
+        output!(
+            "\tds align[8]
+.{label_name}"
+        );
+        write!(output, "\tdb ").unwrap();
+        for cell in cell_catalog.keys() {
+            write!(output, "${:02x},", cell.first_byte()).unwrap();
+        }
+        output!();
+        output!("\tds align[8]");
+        write!(output, "\tdb ").unwrap();
+        for cell in cell_catalog.keys() {
+            write!(output, "${:02x},", cell.second_byte()).unwrap();
+        }
+        output!();
+        output!("\tds align[8]");
+        write!(output, "\tdb ").unwrap();
+        for cell in cell_catalog.keys() {
+            write!(output, "${:02x},", cell.third_byte()).unwrap();
+        }
+        output!();
+    };
+    emit_patterns(main_cell_catalog, main_row_pool, "mainCellCatalog");
+    emit_patterns(subpat_cell_catalog, subpat_row_pool, "subpatCellCatalog");
+
     output!();
     output!("assert LAST_NOTE == {LAST_NOTE}, \"LAST_NOTE == {{LAST_NOTE}}\"");
     output!("assert PATTERN_LENGTH == {PATTERN_LENGTH}, \"PATTERN_LENGTH == {{PATTERN_LENGTH}}\"");
