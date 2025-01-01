@@ -489,6 +489,9 @@ TickSubpattern:
 	ld l, [hl]
 	ld a, [wRowCatalogHigh]
 	ld h, a
+	IF DEF(FORTISSIMO_LOG)
+		dbg_log "CH\{c,2\} reading subpattern row from $\{hl,04$\}: (\{[hl + 512],2\}, \{[hl + 256],2$\}_\{[hl],2$\})"
+	ENDC
 	; Read the row's FX parameter.
 	ld a, [hl]
 	ldh [hUGE_FxParam], a
@@ -660,6 +663,9 @@ ReadRow:
 	ld a, [wRowCatalogHigh]
 	ld d, a
 	; Read the row into the channel's data.
+	IF DEF(FORTISSIMO_LOG)
+		dbg_log "CH\{((hl - wCH1.fxParams) / (wCH2 - wCH1)) + 1\} reading row from $\{de,04$\}: (\{[de + 512],2\}, \{[de + 256],2$\}_\{[de],2$\})"
+	ENDC
 	ld a, [de]
 	ld [hli], a
 	inc d

@@ -10,6 +10,14 @@ A table [comparing pros and cons of many GB music drivers](https://github.com/IS
 
 This requires RGBDS 0.9.0 or later.
 
+## Debugging features
+
+If you're hacking on fortISSimO, you should use an emulator that supported [debugfiles], such as [Emulicious].
+This will enable a lot of runtime checks.
+
+Additionally, since fO stores music data in a fairly oblique way, you can define the variable `FORTISSIMO_LOG` when building (e.g. `rgbasm -DFORTISSIMO_LOG fortISSimO.asm`) to have the debugfile print every row that gets read.
+(The format is arguably a little weird: subpatterns don't print the channel number but the channel “mask” instead; the note ID/offset is simply printed in decimal; and the instrument ID and FX ID are kind of just mashed together.)
+
 ## License
 
 [![CC0 licensed (public domain)](https://licensebuttons.net/p/zero/1.0/80x15.png)](http://creativecommons.org/publicdomain/zero/1.0/)
@@ -20,3 +28,6 @@ To follow the license of hUGETracker and hUGEDriver, fortISSimO is dedicated to 
   <span property="dct:title">fortISSimO</span> have been waived.
   This work is published from <span property="vcard:Country" datatype="dct:ISO3166" content="FR" about="https://eldred.fr">France</span>.
 </p>
+
+[debugfiles]: https://github.com/aaaaaa123456789/gb-debugfiles/blob/master/debugfile.md
+[Enulicious]: https://emulicious.net
