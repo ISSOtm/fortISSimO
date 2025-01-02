@@ -12,7 +12,7 @@ $ ./teNOR -h
 {{#include ./teNOR.help}}
 ```
 
-[^backronym]: This is *totally* not a [backronym](https://en.wikipedia.org/wiki/Backronym). What? ...You don't believe me?
+[^backronym]: This is _totally_ not a [backronym](https://en.wikipedia.org/wiki/Backronym). What? ...You don't believe me?
 
 ## Usage
 
@@ -24,7 +24,7 @@ I believe the core usage should be simple enough, so let's talk about some of th
 ### Song descriptor
 
 The "song descriptor" is the label that will have to be passed to [`hUGE_SelectSong`](./integration.md) later.
-Since it is a label, it must be a valid [RGBASM symbol](https://rgbds.gbdev.io/docs/v0.6.1/rgbasm.5/#SYMBOLS) name (regex: `[A-Za-z_][A-Za-z0-9_#]*`), and since it will be exported, it must be **unique across the entire program**.
+Since it is a label, it must be a valid [RGBASM symbol](https://rgbds.gbdev.io/docs/rgbasm.5/#SYMBOLS) name (regex: `[A-Za-z_][A-Za-z0-9_#@$]*`), and since it will be exported, it must be **unique across the entire program**.
 
 ### Stats
 
@@ -34,7 +34,7 @@ When it's done running, it prints statistics about how much space the optimisati
 If you don't care about the stats, pass the `-q`/`--quiet` option to silence them.
 
 > Note that the reported savings are **not** the difference with the size of an equivalent hUGEDriver export, due to other, more fundamental format differences.
-> Unoptimised fortISSimO exports *should* be smaller than hUGEDriver exports; how much varies from version to version.
+> Unoptimised fortISSimO exports _should_ be smaller than hUGEDriver exports; how much varies from version to version.
 
 ## Output file
 
