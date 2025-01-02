@@ -10,7 +10,7 @@ use chrono::prelude::*;
 use clap::{crate_name, crate_version};
 
 use crate::{
-    optimise::{CellCatalog, InstrKind, OptimResults, OutputCell, PatternId},
+    optimise::{InstrKind, OptimResults, OutputCell, PatternId},
     song::{
         DutyType, EnvelopeDirection, Instrument, InstrumentKind, LfsrWidth, Song, Subpattern,
         SweepDirection, WaveOutputLevel,
@@ -108,7 +108,10 @@ pub(super) fn export(
     }
     output!();
 
-    let mut emit_patterns = |cell_catalog: &CellCatalog, row_pool: &[_], label_name| {
+    for (cell_catalog, row_pool, label_name) in [
+        (main_cell_catalog, main_row_pool, "mainCellCatalog"),
+        (subpat_cell_catalog, subpat_row_pool, "subpatCellCatalog"),
+    ] {
         let mut reverse_lookup = [0; 256];
         for (i, id) in cell_catalog.values().enumerate() {
             reverse_lookup[usize::from(*id)] = i as u8;
@@ -161,9 +164,7 @@ pub(super) fn export(
             write!(output, "${:02x},", cell.third_byte()).unwrap();
         }
         output!();
-    };
-    emit_patterns(main_cell_catalog, main_row_pool, "mainCellCatalog");
-    emit_patterns(subpat_cell_catalog, subpat_row_pool, "subpatCellCatalog");
+    }
 
     output!();
     output!("assert LAST_NOTE == {LAST_NOTE}, \"LAST_NOTE == {{LAST_NOTE}}\"");

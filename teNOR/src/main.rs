@@ -123,7 +123,8 @@ fn main() {
         print_stats(
             &mut stderr,
             &optim_stats,
-            optim_results.main_cell_catalog.len() + optim_results.subpat_cell_catalog.len(),
+            optim_results.main_cell_catalog.len(),
+            optim_results.subpat_cell_catalog.len(),
         );
     }
 }
@@ -152,8 +153,24 @@ impl Display for CliColorChoice {
 fn print_stats(
     stderr: &mut StandardStreamLock<'_>,
     optim_stats: &optimise::OptimStats,
-    nb_unique_cells: usize,
+    nb_unique_main_cells: usize,
+    nb_unique_sub_cells: usize,
 ) {
+    stderr
+        .set_color(ColorSpec::new().set_underline(true))
+        .unwrap();
+    write!(stderr, "Cell \"catalog\" usage:").unwrap();
+    for (nb_unique_cells, name) in [
+        (nb_unique_main_cells, "\"main\" grid,"),
+        (nb_unique_sub_cells, "subpatterns"),
+    ] {
+        stderr.set_color(ColorSpec::new().set_bold(true)).unwrap();
+        write!(stderr, " {nb_unique_cells}").unwrap();
+        stderr.set_color(&ColorSpec::new()).unwrap();
+        write!(stderr, " out of 256 in {name}").unwrap();
+    }
+    writeln!(stderr).unwrap();
+
     stderr
         .set_color(ColorSpec::new().set_underline(true))
         .unwrap();
@@ -227,7 +244,7 @@ fn print_stats(
         report(
             stderr,
             "Cataloguing",
-            nb_unique_cells,
+            nb_unique_main_cells + nb_unique_sub_cells,
             "unique cells",
             optim_stats.saved_bytes_catalog as usize,
         );
@@ -236,7 +253,7 @@ fn print_stats(
         write!(
             stderr,
             "\t...cataloguing {} unique cells wasted ",
-            nb_unique_cells
+            nb_unique_main_cells + nb_unique_sub_cells
         )
         .unwrap();
         stderr.set_color(ColorSpec::new().set_bold(true)).unwrap();
