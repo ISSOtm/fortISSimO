@@ -1,11 +1,11 @@
 # Driver internals
 
-This does not aim to document every single inner working of fortISSimO—there are too many of those, and too few people would be interested—it only contains descriptions of what each *variable* does, since those are at least likely to be useful to people writing [routines](./routines.md).
+This does not aim to document every single inner working of fortISSimO—there are too many of those, and too few people would be interested—it only contains descriptions of what each _variable_ does, since those are at least likely to be useful to people writing [routines](./routines.md).
 
 Though I'm not opposed to the scope being expanded, if someone is interested.
 
-> Last updated as of commit [`7fb8329`](https://github.com/ISSOtm/fortISSimO/tree/7fb83298d9aa0296fa075d7584a13abdd41b7d06).
-> This is susceptible to having changed since then; see [the changes since then](https://github.com/ISSOtm/fortISSimO/compare/7fb83298d9aa0296fa075d7584a13abdd41b7d06...master), particularly the file `src/fortISSimO.asm`.
+> Last updated as of commit [`94a309b`](https://github.com/ISSOtm/fortISSimO/tree/94a309bb8d10e7947d9e2687a769cba9b89d2393).
+> This is susceptible to having changed since then; see [the changes since then](https://github.com/ISSOtm/fortISSimO/compare/94a309bb8d10e7947d9e2687a769cba9b89d2393...master), particularly the file `src/fortISSimO.asm`.
 
 **Be careful** of accessing these variables yourself if fortISSimO runs in an interrupt handler!
 It may be possible for fortISSimO to execute between your code reading different bytes, and thus end up with an inconsistent state!
@@ -18,22 +18,22 @@ All of the following variables are merely copied from the song header when `hUGE
 (Their names should be self-explanatory as to what they contain.)
 They can be modified at any time **between** two executions of `hUGE_TickSong`, and will take effect the next time they are read.
 
-Variable          | Accessed when?
-------------------|----------------
-`wTicksPerRow`    | On tick 0 of a new row.
-`wLastPatternIdx` | When "naturally" switching to the next pattern.
-`wDutyInstrs`     | On tick 0 of a new row, if such an instrument must be loaded.
-`wWaveInstrs`     | On tick 0 of a new row, if such an instrument must be loaded.
-`wNoiseInstrs`    | On tick 0 of a new row, if such an instrument must be loaded.
-`wRoutine`        | Every time a "call routine" effect is executed.
-`wWaves`          | When an instrument with a new wave (see `hUGE_LoadedWaveID`) is loaded, and every time a "change timbre" effect is executed on CH3.
+| Variable          | Accessed when?                                                                                                                      |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `wTicksPerRow`    | On tick 0 of a new row.                                                                                                             |
+| `wLastPatternIdx` | When "naturally" switching to the next pattern.                                                                                     |
+| `wDutyInstrs`     | On tick 0 of a new row, if such an instrument must be loaded.                                                                       |
+| `wWaveInstrs`     | On tick 0 of a new row, if such an instrument must be loaded.                                                                       |
+| `wNoiseInstrs`    | On tick 0 of a new row, if such an instrument must be loaded.                                                                       |
+| `wRoutine`        | Every time a "call routine" effect is executed.                                                                                     |
+| `wWaves`          | When an instrument with a new wave (see `hUGE_LoadedWaveID`) is loaded, and every time a "change timbre" effect is executed on CH3. |
 
 ## Global variables
 
 - `hUGE_LoadedWaveID`: ID of the wave the driver currently thinks is loaded in RAM, or `hUGE_NO_WAVE` for "none".
 - `wArpState`: Which offset arpeggios should apply on this tick (1 = none, 2 = lower nibble, 3 = upper nibble); decremented before every tick.
 - `wRowTimer`: Decremented before every tick, and if it reaches 0, a new row is switched to.
-- `wOrderIdx`: Offset *in bytes* within the order "columns"; since every entry (a pointer) is 2 bytes, this is always a multiple of 2.
+- `wOrderIdx`: Offset _in bytes_ within the order "columns"; since every entry (a pointer) is 2 bytes, this is always a multiple of 2.
 - `wPatternIdx`: Which row in the current patterns is active, with bits 7 and 6 set. Incremented at the beginning of a tick where a new row is played.
 - `wForceRow`: When switching to a new row, if this is set, this will be written to `wPatternIdx` instead of it being incremented.
 

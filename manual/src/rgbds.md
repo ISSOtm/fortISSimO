@@ -16,13 +16,15 @@ Here comes `hUGE_SelectSong`!
 This function simply needs to be called with [the song's label](./teNOR.md#song-descriptor) in `de` ([example](https://github.com/ISSOtm/fortISSimO-demo/blob/d9a93b5460ee36fe0d18b5b9a061b7ba93b02549/src/main.asm#L97-L98)).
 
 This function's relationship with the APU is as follows:
-- This function does not touch [`NR52`], so you must turn the APU on yourself (typically as part of the global init above, see [this example](https://github.com/ISSOtm/fortISSimO-demo/blob/5463719e48580cc835d7459d607ee30056f51de8/src/main.asm#L21)).
+
+- This function does not touch [`NR52`], so you must turn the APU on yourself **beforehand** (typically as part of the global init above, see [this example](https://github.com/ISSOtm/fortISSimO-demo/blob/5463719e48580cc835d7459d607ee30056f51de8/src/main.asm#L21)).
 - This function does not touch [`NR51`] or [`NR50`] either; if your songs make use of panning, they should include `8xx` and/or `5xx` effects on their first row to reset those registers.
 
   Keep in mind that `8xx` and `5xx` are global, and thus affect sound effects as well!
-- This function mutes every channel that is "owned" by the driver; if you do not want this (for example, to join two tracks seamlessly), set `hUGE_MutedChannels` to e.g. $0F before calling `hUGE_SelectSong`.
 
-Additionally, `hUGE_TickSound` must not run in the middle of this function!
+- This function mutes every channel that is "owned" by the driver; if you do not want this (for example, to join two tracks seamlessly), set `hUGE_MutedChannels` to e.g. $0F before calling `hUGE_SelectSong`, and restore it afterwards.
+
+Additionally, `hUGE_TickSound` **must not** run in the middle of this function!
 This can happen if it is called from an interrupt handler, notably.
 The recommended fix is to "guard" calls to `hUGE_TickSound`, like this:
 
@@ -54,10 +56,16 @@ A given track expects this function to be called on a specific schedule, otherwi
 Imagine playing a MP3 file at 1.5× speed, for example—that's not quite it, but close.
 
 The schedule is simple:
+
 - If "Enable timer-based tempo" was not selected in hUGETracker, then `hUGE_TickSound` must be called once per frame.
   This is most often done from an interrupt handler (preferably STAT to save VBlank time, but VBlank is fine too), but can also be done in the main loop.
+
+  You can pass the `--vblank` option to [teNOR] to check that the song is properly formatted for this schedule.
+
 - If "Enable timer-based tempo" was selected in hUGETracker, then `hUGE_TickSound` must be called at a fixed rate.
   This rate can be obtained by setting [`TAC`] to 4 (4096 Hz) and [`TMA`] to the value in the "Tempo (timer divider)" field, or any equivalent method.
+
+  You can pass the `--timer` option to [teNOR] to check that the song is properly formatted for this schedule.
 
 Timer-based tempo can have annoying side effects to the rest of the game's programming, so VBlank-based tempo is recommended.
 
@@ -66,3 +74,4 @@ Timer-based tempo can have annoying side effects to the rest of the game's progr
 [`NR50`]: https://gbdev.io/pandocs/Audio_Registers.html#ff24--nr50-master-volume--vin-panning
 [`TAC`]: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html#ff07--tac-timer-control
 [`TMA`]: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html#ff06--tma-timer-modulo
+[teNOR]: ./teNOR.md

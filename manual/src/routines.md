@@ -30,7 +30,7 @@ INCLUDE "exports/final_boss_music.asm"
 	jr z, .changeInvuln
 
 	; `610` charges the boss' attack.
-	; (This can run a lot more than you expect—
+	; (This can run a *lot* more often than you expect—
 	;  please see the caveat in the next section.)
 	ld hl, wBossChargeCounter
 	inc [hl]

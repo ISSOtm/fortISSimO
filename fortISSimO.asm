@@ -28,15 +28,6 @@ ENDC
 ; A "TODO: loose" comment means that the `hli` it's attached to could be used as an optimisation point.
 
 
-; Some configuration, with defaults.
-IF !DEF(FORTISSIMO_ROM)
-	DEF FORTISSIMO_ROM equs "ROM0"
-ENDC
-IF !DEF(FORTISSIMO_RAM)
-	DEF FORTISSIMO_RAM equs "WRAM0"
-ENDC
-
-
 IF !DEF(HUGETRACKER)
 	INCLUDE "hardware.inc" ; Bread & butter: check.
 	INCLUDE "fortISSimO.inc" ; Get the note constants.
@@ -46,6 +37,19 @@ ELSE ; The above files are accessed differently when inside hUGETracker.
 	IF !DEF(FORTISSIMO_INC)
 		FAIL "It seems that you forgot to overwrite hUGETracker's `hUGE.inc` with `fortISSimO.inc`!"
 	ENDC
+ENDC
+
+
+; Some configuration, with defaults.
+; See https://eldred.fr/fortISSimO/integration.html#tuning-fortissimo for details.
+IF !DEF(FORTISSIMO_ROM)
+	def FORTISSIMO_ROM equs "ROM0"
+ENDC
+IF !DEF(FORTISSIMO_RAM)
+	def FORTISSIMO_RAM equs "WRAM0"
+ENDC
+IF !DEF(FORTISSIMO_PANNING)
+	def FORTISSIMO_PANNING equ rNR51
 ENDC
 
 
@@ -872,7 +876,7 @@ FxSetMasterVolume:
 
 FxSetPanning:
 	ld a, b ; Read the FX's params.
-	ldh [rNR51], a
+	ldh [FORTISSIMO_PANNING], a
 	ret
 
 
