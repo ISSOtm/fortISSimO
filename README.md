@@ -15,8 +15,13 @@ This requires RGBDS 0.9.0 or later.
 If you're hacking on fortISSimO, you should use an emulator that supported [debugfiles], such as [Emulicious].
 This will enable a lot of runtime checks.
 
-Additionally, since fO stores music data in a fairly oblique way, you can define the variable `FORTISSIMO_LOG` when building (e.g. `rgbasm -DFORTISSIMO_LOG fortISSimO.asm`) to have the debugfile print every row that gets read.
-(The format is arguably a little weird: subpatterns don't print the channel number but the channel “mask” instead; the note ID/offset is simply printed in decimal; and the instrument ID and FX ID are kind of just mashed together.)
+Additionally, since fO stores music data in a fairly oblique way, you can define the variable `FORTISSIMO_LOG` when building (e.g. `rgbasm -DFORTISSIMO_LOG=idx,main_row fortISSimO.asm`) to have some information logged to your emulator's console (again, via debugfiles):
+
+- `row_idx` prints the order and row indices every time they change;
+- `main_row` prints every row that gets read from the "main" grid;
+- `subpat_row` prints every row that gets read from subpatterns.
+
+[^row_fmt]: The format is arguably a little weird: subpatterns don't print the channel number but the channel “mask” instead; the note ID/offset is simply printed in decimal; and the instrument ID and FX ID are kind of just mashed together.
 
 ## License
 

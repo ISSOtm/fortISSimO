@@ -1,7 +1,8 @@
 ; If you want to use fortISSimO inside of hUGETracker itself, please read the following.
 ;
 ; fortISSimO is designed to be usable inside of hUGETracker, however:
-;  - This is somewhat experimental, and it's possible to glitch out, hang, and/or crash hUGETracker.
+;  - This is never truly stable, since fortISSimO is a third-party project relying on undocumented hUGETracker internals.
+;    It should be possible, *although it has never happened yet*, to glitch out, hang, and/or crash hUGETracker.
 ;  - At this time, a hUGETracker bug prevents the "note cut" effect (`E`) from working on CH3.
 ;    This does not affect ROM exports.
 ;  - To configure fortISSimO for use in hUGETracker, please uncomment the following line (delete the semicolon),
@@ -31,10 +32,10 @@ ENDC
 ; - A "pattern" is a series of up to 64 "rows".
 ; - A "table" is a subpattern
 ;
-; "TODO: loose" means that this `hli` could be used as an optimisation point
+; A "TODO: loose" comment means that the `hli` it's attached to could be used as an optimisation point.
 
 
-; Some defaults.
+; Some configuration, with defaults.
 IF !DEF(FORTISSIMO_ROM)
 	DEF FORTISSIMO_ROM equs "ROM0"
 ENDC
@@ -58,18 +59,18 @@ ENDC
 IF DEF(override)
 	PURGE override
 ENDC
+MACRO override ; Ensures that fO's symbols don't conflict with pre-defined ones.
+	REPT _NARG
+		IF DEF(\1)
+			PURGE \1
+		ENDC
+		shift
+	ENDR
+ENDM
+override dbg_var, dbg_action, dbg_log, runtime_assert, unreachable ; Pre-defined ones, if any, may have different semantics.
+
 IF DEF(PRINT_DEBUGFILE)
 	PRINTLN "@debugfile 1.0.0"
-
-	MACRO override ; Ensures that fO's symbols don't conflict with pre-defined ones.
-		REPT _NARG
-			IF DEF(\1)
-				PURGE \1
-			ENDC
-			shift
-		ENDR
-	ENDM
-	override dbg_var, dbg_action, dbg_log, runtime_assert, unreachable ; Pre-defined ones, if any, may have different semantics.
 
 	MACRO dbg_var ; <name>, <default value>
 	    DEF DEFAULT_VALUE equs "0"
@@ -90,44 +91,51 @@ IF DEF(PRINT_DEBUGFILE)
 		PURGE OFS_FROM_BASE, ACTION_COND
 	ENDM
 
-	MACRO dbg_log ; <message:dbg_str> [, <condition:dbg_expr>]
-		DEF MSG equs \1
-		SHIFT
-		dbg_action "message \"{MSG}\"", \#
-		PURGE MSG
+ELSE ; If not printing debugfiles to stdout, define the "core" macros as do-nothing.
+	MACRO dbg_var
 	ENDM
-
-	MACRO runtime_assert ; <condition:dbg_expr> [, <message:dbg_str>]
-		DEF MSG equs "assert failure"
-		IF _NARG > 1
-			REDEF MSG equs \2
-		ENDC
-		dbg_action "alert \"{MSG}\"", !(\1)
-		PURGE MSG
+	MACRO dbg_action
 	ENDM
-
-	MACRO unreachable ; [<message:dbg_str>]
-		DEF MSG equs "unreachable code reached!"
-		IF _NARG > 0
-			REDEF MSG equs \1
-		ENDC
-		dbg_action "alert \"In {.}: {MSG}\""
-		PURGE MSG
-	ENDM
-
-ELSE ; If not printing debugfiles to stdout, define the macros as do-nothing.
-	MACRO override
-		redef def_empty equs "MACRO \\1\nENDM"
-		REPT _NARG
-			IF DEF(\1)
-				PURGE \1
-			ENDC
-			def_empty
-			shift
-		ENDR
-	ENDM
-	override dbg_var, dbg_action, dbg_log, runtime_assert, unreachable
 ENDC
+
+MACRO dbg_log ; <message:dbg_str> [, <condition:dbg_expr>]
+	DEF MSG equs \1
+	SHIFT
+	dbg_action "message \"{MSG}\"", \#
+	PURGE MSG
+ENDM
+
+MACRO runtime_assert ; <condition:dbg_expr> [, <message:dbg_str>]
+	DEF MSG equs "assert failure"
+	IF _NARG > 1
+		REDEF MSG equs \2
+	ENDC
+	dbg_action "alert \"{MSG}\"", !(\1)
+	PURGE MSG
+ENDM
+
+MACRO unreachable ; [<message:dbg_str>]
+	DEF MSG equs "unreachable code reached!"
+	IF _NARG > 0
+		REDEF MSG equs \1
+	ENDC
+	dbg_action "alert \"In {.}: {MSG}\""
+	PURGE MSG
+ENDM
+
+
+IF !DEF(FORTISSIMO_LOG)
+	def FORTISSIMO_LOG equs ""
+ELSE
+	redef FORTISSIMO_LOG equs ",{FORTISSIMO_LOG},"
+ENDC
+MACRO fO_log ; <category:name>, <message:dbg_str> [, <condition:dbg_expr>]
+	IF STRIN("{FORTISSIMO_LOG}", ",\1,")
+		shift
+		dbg_log \#
+	ENDC
+ENDM
+
 
 
 ; Note: SDCC's linker is crippled by the lack of alignment support.
@@ -365,6 +373,7 @@ ENDC
 	ld a, [hli]
 	assert PATTERN_LENGTH == 1 << 6, "Pattern length must be a power of 2"
 	and PATTERN_LENGTH - 1
+	fO_log row_idx, "=== Order row \{[wOrderIdx] / 2 + 1\}, row \{a\} ==="
 	ld b, a
 	; Reset the "force row" byte.
 	assert wPatternIdx + 1 == wForceRow
@@ -490,9 +499,7 @@ TickSubpattern:
 	ld l, [hl]
 	ld a, [wSubpatRowCatalogHigh]
 	ld h, a
-	IF DEF(FORTISSIMO_LOG)
-		dbg_log "CH\{c,2\} reading subpattern row from $\{hl,04$\}: (\{[hl + 512],2\}, \{[hl + 256],2$\}_\{[hl],2$\})"
-	ENDC
+	fO_log subpat_row, "CH\{c,2\} reading subpattern row from $\{hl,04$\}: (\{[hl + 512],2\}, \{[hl + 256],2$\}_\{[hl],2$\})"
 	; Read the row's FX parameter.
 	ld a, [hl]
 	ldh [hUGE_FxParam], a
@@ -664,9 +671,7 @@ ReadRow:
 	ld a, [wRowCatalogHigh]
 	ld d, a
 	; Read the row into the channel's data.
-	IF DEF(FORTISSIMO_LOG)
-		dbg_log "CH\{((hl - wCH1.fxParams) / (wCH2 - wCH1)) + 1\} reading row from $\{de,04$\}: (\{[de + 512],2\}, \{[de + 256],2$\}_\{[de],2$\})"
-	ENDC
+	fO_log main_row, "CH\{((hl - wCH1.fxParams) / (wCH2 - wCH1)) + 1\} reading row from $\{de,04$\}: (\{[de + 512],2\}, \{[de + 256],2$\}_\{[de],2$\})"
 	ld a, [de]
 	ld [hli], a
 	inc d
