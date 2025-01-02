@@ -1,6 +1,7 @@
 ; This file is to be included by generated songs as well.
 
-IF !DEF(PATTERN_LENGTH) ; Simple include guard.
+IF !DEF(FORTISSIMO_INC) ; Simple include guard, but also used by fO to check that the correct include file is provided.
+def FORTISSIMO_INC equ 1
 
 def PATTERN_LENGTH equ 64 ; How many rows in a pattern.
 def ROW_SIZE equ 3 ; How many bytes per row.

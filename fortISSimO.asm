@@ -1,15 +1,8 @@
-; If you want to use fortISSimO inside of hUGETracker itself, please read the following.
+; If you want to use fortISSimO inside of hUGETracker itself,
+; please read the dedicated section in the manual:
+; https://eldred.fr/fortISSimO/hugetracker.html
 ;
-; fortISSimO is designed to be usable inside of hUGETracker, however:
-;  - This is never truly stable, since fortISSimO is a third-party project relying on undocumented hUGETracker internals.
-;    It should be possible, *although it has never happened yet*, to glitch out, hang, and/or crash hUGETracker.
-;  - At this time, a hUGETracker bug prevents the "note cut" effect (`E`) from working on CH3.
-;    This does not affect ROM exports.
-;  - To configure fortISSimO for use in hUGETracker, please uncomment the following line (delete the semicolon),
-;    and make sure to write the hUGETracker version between quotation marks.
-;    For example, you'd get:   DEF HUGETRACKER equs "1.0"
-;
-; def HUGETRACKER equs "1.0"
+; def HUGETRACKER equs "???"
 
 IF DEF(HUGETRACKER)
 	WARN "\n\tPlease report this issue to fortISSimO, *NOT* hUGETracker!\n\t(Even if it seems unrelated.)\n\t>>> https://github.com/ISSOtm/fortISSimO/issues <<<\n"
@@ -50,6 +43,9 @@ IF !DEF(HUGETRACKER)
 ELSE ; The above files are accessed differently when inside hUGETracker.
 	INCLUDE "include/hardware.inc"
 	INCLUDE "include/hUGE.inc"
+	IF !DEF(FORTISSIMO_INC)
+		FAIL "It seems that you forgot to overwrite hUGETracker's `hUGE.inc` with `fortISSimO.inc`!"
+	ENDC
 ENDC
 
 
