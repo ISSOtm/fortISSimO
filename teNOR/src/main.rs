@@ -3,11 +3,10 @@ use std::{
     fmt::Display,
     io::{IsTerminal, Write},
     path::Path,
-    process::exit,
+    process::ExitCode,
 };
 
 use clap::{Parser, ValueEnum};
-use optimise::CellCatalog;
 use termcolor::{Color, ColorSpec, StandardStream, StandardStreamLock, WriteColor};
 
 mod export;
@@ -19,7 +18,7 @@ const LAST_NOTE: u8 = 72;
 const PATTERN_LENGTH: u8 = 64;
 
 #[derive(Debug, Clone, Parser)]
-#[command(version, about)]
+#[command(version, about, arg_required_else_help = true)]
 struct CliArgs {
     /// Path to the `.uge` file to be exported.
     input_path: OsString,
@@ -32,37 +31,65 @@ struct CliArgs {
     ///
     /// Keep in mind that this path will be evaluated by RGBASM, so relative to the directory that it will be invoked in!
     /// If empty, no INCLUDE directive will be emitted.
-    #[arg(short, long, default_value = "fortISSimO.inc")]
+    #[arg(short, long, default_value = "fortISSimO.inc", value_name = "PATH")]
     include_path: String,
 
     /// Type of the section that the data will be exported to; if omitted, no SECTION directive will be emitted.
     ///
     /// Can include constraints, for example: `ROMX,BANK[2]`.
-    #[arg(short = 't', long)]
+    #[arg(short = 't', long, value_name = "TYPE")]
     section_type: Option<String>,
     /// Name of the section that the data will be exported to.
     ///
     /// Be wary of characters special to RGBASM, such as double quotes!
     /// This has no effect if the section type is omitted.
-    #[arg(short = 'n', long, default_value = "Song Data")]
+    #[arg(
+        short = 'n',
+        long,
+        default_value = "Song Data",
+        value_name = "NAME",
+        requires = "section_type"
+    )]
     section_name: String,
 
-    /// Name of the label that will point to the song's header (hUGETracker calls this the "song descriptor").
+    /// Name of the label that will point to the track's header (hUGETracker calls this the "song descriptor").
     ///
     /// If omitted, this will be deduced from the input file name.
-    #[arg(short = 'd', long)]
-    song_descriptor: Option<String>,
+    // The alias is for back-compat only.
+    #[arg(short = 'd', long, alias = "song-descriptor", value_name = "LABEL")]
+    descriptor: Option<String>,
+
+    /// Require the track being converted to have the `Enable timer-based tempo` checkbox unchecked.
+    #[arg(
+        help_heading = "Playback method",
+        short,
+        long,
+        conflicts_with = "timer"
+    )]
+    vblank: bool,
+    /// Require the track being converted to have the `Enable timer-based tempo` checkbox checked,
+    /// and the `Tempo (timer divider)` box set to a specific value.
+    #[arg(
+        help = "Require the track being converted to have the `Enable timer-based tempo` checkbox checked",
+        long_help = "Require the track being converted to have the `Enable timer-based tempo` checkbox checked, and the `Tempo (timer divider)` box set to a specific value",
+        help_heading = "Playback method",
+        short = 'T',
+        long,
+        conflicts_with = "vblank",
+        value_name = "DIVIDER"
+    )]
+    timer: Option<u8>,
 
     /// Do not emit stats at the end.
     #[arg(short = 'q', long)]
     quiet: bool,
 
     /// Use colours when writing to standard error (errors, stats, etc.)
-    #[arg(long, default_value_t)]
+    #[arg(long, default_value_t, value_name = "WHEN")]
     color: CliColorChoice,
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = CliArgs::parse();
     let color_choice = match args.color {
         CliColorChoice::Always => termcolor::ColorChoice::Always,
@@ -79,7 +106,7 @@ fn main() {
             stderr
                 .set_color(ColorSpec::new().set_bold(true).set_fg(Some(Color::Red)))
                 .unwrap();
-            write!(stderr, "Error: ").unwrap();
+            write!(stderr, "error: ").unwrap();
             stderr
                 .set_color(ColorSpec::new().set_bold(true).set_fg(None))
                 .unwrap();
@@ -94,7 +121,7 @@ fn main() {
         Err(err) => {
             write_error!("Failed to read file \"{}\": ", input_path.display();
                 "{err}");
-            exit(1);
+            return ExitCode::FAILURE;
         }
     };
     let song = match uge::parse_song(&data) {
@@ -102,20 +129,43 @@ fn main() {
         Err(err) => {
             write_error!("Unable to parse a UGE song from \"{}\": ", input_path.display();
                 "{err}");
-            exit(1);
+            return ExitCode::FAILURE;
         }
     };
+    if args.vblank {
+        if song.timer_divider.is_some() {
+            write_error!("Expected \"{}\" to specify VBlank-based playback!\n", input_path.display();
+                "Please uncheck the `Enable timer-based playback` checkbox in the `General` tab, and alter your `F` effects as necessary");
+            return ExitCode::FAILURE;
+        }
+    } else if let Some(divider) = args.timer {
+        match song.timer_divider {
+            None => {
+                write_error!("Expected \"{}\" to specify timer-based playback!\n", input_path.display();
+                    "Please check the `Enable timer-based playback` checkbox in the `General` tab, set the `Tempo (timer divider)` field to {divider}, and alter your `F` effects as necessary");
+                return ExitCode::FAILURE;
+            }
+            Some(song_div) => {
+                if song_div != divider {
+                    write_error!("\"{}\" has the wrong timer divider\n", input_path.display();
+                        "Please set the `Tempo (timer divider)` field in the `General` tab to {divider}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
+    }
 
     let (optim_results, optim_stats) = optimise::optimise(&song);
 
-    let mut check = |catalog: &CellCatalog, name| {
+    for (catalog, name) in [
+        (&optim_results.main_cell_catalog, "the main grid"),
+        (&optim_results.subpat_cell_catalog, "subpatterns"),
+    ] {
         if let nb_unique_cells @ 257.. = catalog.len() {
             write_error!("The song has {nb_unique_cells} unique cells in {name}, the max is 256!\n" ; "There is not much that can be done, sorry. Try simplifying it?");
-            exit(1);
+            return ExitCode::FAILURE;
         }
-    };
-    check(&optim_results.main_cell_catalog, "the main grid");
-    check(&optim_results.subpat_cell_catalog, "subpatterns");
+    }
 
     export::export(&args, &song, input_path, &optim_results);
 
@@ -127,6 +177,8 @@ fn main() {
             optim_results.subpat_cell_catalog.len(),
         );
     }
+
+    ExitCode::SUCCESS
 }
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]

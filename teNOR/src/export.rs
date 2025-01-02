@@ -77,7 +77,7 @@ pub(super) fn export(
         output!();
     }
 
-    match &args.song_descriptor {
+    match &args.descriptor {
         Some(label) => output!("{label}::"),
         None => {
             let stem: &Path = input_path
