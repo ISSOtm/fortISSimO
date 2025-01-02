@@ -12,6 +12,7 @@ For example, currently, [teNOR] emits duty instruments immediately after the "ro
 However, all fields of the song header will remain in the specified order (until the next major release of fO, anyway).
 
 Unless specified:
+
 - there is **no padding** between any of the structures' fields,
 - all multi-byte values are stored in little-endian format (low byte first).
 
@@ -24,11 +25,14 @@ Unless specified:
 1. **POINTER** — To the array of noise instruments.
 1. **POINTER** — To the song's routine.
 1. **POINTER** — To the array of waves.
-1. *For each channel, from `1` to `4`*: its column of the order matrix:
-   1. *As many as specified above*:
+1. **BYTE** — High byte of the pointer to the "main" patterns' cell catalog ([see below][catalog]).
+1. **BYTE** — High byte of the pointer to the subpatterns' cell catalog ([see below][catalog]).
+1. _For each channel, from `1` to `4`_: its column of the order matrix:
+   1. _As many as specified above_:
       1. **POINTER** — To a pattern.
 
 [subpattern]: #patterns
+[catalog]: #row-catalogs
 
 ## Patterns
 
@@ -36,9 +40,15 @@ A pattern is simply a collection of rows; [teNOR] attempts to find overlap betwe
 
 There is no definitive end to the row pool—simply, only as many rows are emitted as are necessary.
 
-### Rows
+Further, rows are _not_ emitted directly: instead, patterns contain indices that are used to index a "catalog" of rows.
+(This enables separate copies of the same row to be stored more efficiently, but ends up imposing a limit of 256 unique cells across a track.)
 
-Rows are constitued differently depending on whether they belong to a "main" pattern, or a subpattern.
+### Row catalogs
+
+Rows are composed of three bytes, stored in three 256-byte-aligned arrays.
+(Yes, there is some amount of wasted padding between them. 😞 :sad_panda:)
+
+There are two catalogs, one for rows belonging to the "main" patterns, and one for rows belonging to subpatterns; the contents of their arrays is slightly different between each:
 
 #### Pattern rows
 
@@ -68,24 +78,24 @@ Since there are 32 possible rows to jump to, 5 bits are needed—the unused 7<su
 Effect IDs are unchanged from hUGETracker.
 The effect parameter is, however, sometimes different.
 
-Effect         | ID (hex) | Stored parameter
----------------|----------|------------------
-Arpeggio       |    0     | Unchanged.
-Porta up       |    1     | Unchanged.
-Porta down     |    2     | Unchanged.
-Tone porta     |    3     | Unchanged.
-Vibrato        |    4     | Unchanged.
-Set master vol |    5     | Unchanged.
-Call routine   |    6     | Unchanged.
-Note delay     |    7     | Unchanged.
-Set panning    |    8     | Unchanged.
-Change timbre  |    9     | Unchanged.
-Vol slide      |    A     | Unchanged.
-Pos jump       |    B     | The pattern ID is stored in [`wOrderIdx`](./internals.md) format.
-Set vol        |    C     | Nibbles are swapped from hUGETracker.
-Pattern break  |    D     | The row ID is stored in [`wForceRow`](./internals.md)'s format.
-Note cut       |    E     | Unchanged.
-Set tempo      |    F     | Unchanged.
+| Effect         | ID (hex) | Stored parameter                                                  |
+| -------------- | -------- | ----------------------------------------------------------------- |
+| Arpeggio       | 0        | Unchanged.                                                        |
+| Porta up       | 1        | Unchanged.                                                        |
+| Porta down     | 2        | Unchanged.                                                        |
+| Tone porta     | 3        | Unchanged.                                                        |
+| Vibrato        | 4        | Unchanged.                                                        |
+| Set master vol | 5        | Unchanged.                                                        |
+| Call routine   | 6        | Unchanged.                                                        |
+| Note delay     | 7        | Unchanged.                                                        |
+| Set panning    | 8        | Unchanged.                                                        |
+| Change timbre  | 9        | Unchanged.                                                        |
+| Vol slide      | A        | Unchanged.                                                        |
+| Pos jump       | B        | The pattern ID is stored in [`wOrderIdx`](./internals.md) format. |
+| Set vol        | C        | Nibbles are swapped from hUGETracker.                             |
+| Pattern break  | D        | The row ID is stored in [`wForceRow`](./internals.md)'s format.   |
+| Note cut       | E        | Unchanged.                                                        |
+| Set tempo      | F        | Unchanged.                                                        |
 
 ## Instruments
 
@@ -114,7 +124,7 @@ Each bank is an array of up to 15 instruments, with no padding in-between.
 
 ### Noise
 
-1. **BYTE** — Volume, in [NR42] format.
+1. **BYTE** — Volume & envelope, in [NR42] format.
 1. **POINTER** — Pointer to the [subpattern], or 0 if not enabled.
 1. **BYTE** — Control bits:
    - **BIT 7** — 0 if the LFSR should be in "long" (15-bit) mode, 1 if the LFSR should be in "short" (7-bit) mode.

@@ -581,7 +581,7 @@ TickSubpattern:
 	or b ; Add the length bit.
 	ldh [c], a
 	pop de ; Restore the pointer to the channel's note ID (for FX).
-	pop bc ; Retore the FX ID and the channel mask.
+	pop bc ; Restore the FX ID and the channel mask.
 .appliedOffset
 
 	; Play the row's FX.

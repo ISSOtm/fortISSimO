@@ -260,7 +260,7 @@ pub(super) fn generate_row_pool(
                 // Try finding an overlapping cell that is reachable.
                 ordering[next_idx..]
                     .iter()
-                    .take_while(|&&(_, start_ofs)| start_ofs <= nb_rows_emitted) // The list is sotred by increasing `start_ofs`, so if this is true once, it will remain so.
+                    .take_while(|&&(_, start_ofs)| start_ofs <= nb_rows_emitted) // The list is sorted by increasing `start_ofs`, so if this is true once, it will remain so.
                     .filter_map(|&(pattern_id, start_ofs)| {
                         // We checked that we aren't past the pattern's beginning, but also check that we aren't past its end.
                         // (This is possible when a pattern is "nested" inside of another.)
