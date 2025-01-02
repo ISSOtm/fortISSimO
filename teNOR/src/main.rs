@@ -31,19 +31,31 @@ struct CliArgs {
     ///
     /// Keep in mind that this path will be evaluated by RGBASM, so relative to the directory that it will be invoked in!
     /// If empty, no INCLUDE directive will be emitted.
-    #[arg(short, long, default_value = "fortISSimO.inc", value_name = "PATH")]
+    #[arg(
+        help_heading = "Output modifiers",
+        short,
+        long,
+        default_value = "fortISSimO.inc",
+        value_name = "PATH"
+    )]
     include_path: String,
 
     /// Type of the section that the data will be exported to; if omitted, no SECTION directive will be emitted.
     ///
     /// Can include constraints, for example: `ROMX,BANK[2]`.
-    #[arg(short = 't', long, value_name = "TYPE")]
+    #[arg(
+        help_heading = "Output modifiers",
+        short = 't',
+        long,
+        value_name = "TYPE"
+    )]
     section_type: Option<String>,
     /// Name of the section that the data will be exported to.
     ///
     /// Be wary of characters special to RGBASM, such as double quotes!
     /// This has no effect if the section type is omitted.
     #[arg(
+        help_heading = "Output modifiers",
         short = 'n',
         long,
         default_value = "Song Data",
@@ -56,7 +68,13 @@ struct CliArgs {
     ///
     /// If omitted, this will be deduced from the input file name.
     // The alias is for back-compat only.
-    #[arg(short = 'd', long, alias = "song-descriptor", value_name = "LABEL")]
+    #[arg(
+        help_heading = "Output modifiers",
+        short = 'd',
+        long,
+        alias = "song-descriptor",
+        value_name = "LABEL"
+    )]
     descriptor: Option<String>,
 
     /// Require the track being converted to have the `Enable timer-based tempo` checkbox unchecked.
