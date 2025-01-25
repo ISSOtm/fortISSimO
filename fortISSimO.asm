@@ -860,7 +860,7 @@ FxChangeTimbre:
 	jr c, FxChangeTimbre2.ch3
 .ch4
 	; Keep the polynom bits, but replace the LFSR width bit.
-	runtime_assert (b == 0) || (b == {AUD4POLY_7STEP}), "Invalid argument to FxChangeTimbre for CH4!"
+	runtime_assert (b == 0) || (b == {AUD4POLY_7STEP}), "Invalid timbre change for CH4!"
 	ldh a, [rNR43]
 	and ~AUD4POLY_7STEP ; Reset the LFSR width bit.
 	or b
