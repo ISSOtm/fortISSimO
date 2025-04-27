@@ -103,9 +103,9 @@ impl<'patterns> RowPoolBuilder<'patterns> {
         let first_row = &pattern.0[0];
 
         let mut rows = self.rows();
-        let mut start_row_idx = 0;
+        let mut start_row_idx = usize::MAX;
         'try_somewhere_else: while let Some(cell) = rows.next() {
-            start_row_idx += 1;
+            start_row_idx = start_row_idx.wrapping_add(1);
             if !cell.can_overlap_with(first_row) {
                 continue;
             }
