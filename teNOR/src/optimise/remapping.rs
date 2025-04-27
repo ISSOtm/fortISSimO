@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-
 use crate::song::EffectId;
 
-use super::{AnnotatedCell, CellFirstHalf, Effect, InstrKind, OptimisedPattern, PatternId};
+use super::{
+    AnnotatedCell, CellFirstHalf, Effect, InstrKind, OptimisedPattern, PatternId, PatternStore,
+};
 
 #[derive(Debug, Clone)]
 pub struct CompactedMapping<const N: usize>(pub(super) [u8; N], pub(super) usize);
@@ -77,7 +77,7 @@ pub(super) fn remap_instrs(pattern: &mut OptimisedPattern, mapping: &[u8; 15]) {
     }
 }
 
-pub(super) fn remap_waves(patterns: &mut HashMap<PatternId, OptimisedPattern>, mapping: &[u8; 16]) {
+pub(super) fn remap_waves(patterns: &mut PatternStore, mapping: &[u8; 16]) {
     for (id, pattern) in patterns {
         if matches!(
             id,

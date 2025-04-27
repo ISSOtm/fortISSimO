@@ -225,7 +225,7 @@ pub(super) fn generate_row_pool(
     }: RowPoolBuilder,
 ) -> (Vec<OutputCell>, CellCatalog, isize) {
     let mut output = Vec::new();
-    let mut cell_catalog = CellCatalog::new();
+    let mut cell_catalog = CellCatalog::default();
     let mut next_id = Wrapping(0); // An ID overflow will trigger an error in a later stage; for now, just ensure that we get there without panicking.
     let mut nb_saved_bytes = 0;
 

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    collections::HashMap,
+    hash::{BuildHasherDefault, DefaultHasher, Hash},
+};
 
 use crate::{
     song::{EffectId, Instrument, InstrumentKind, Note, PatternCell, Song, SubpatternCell},
@@ -244,8 +247,8 @@ pub enum OutputCell {
 }
 
 /// Convenience shortcuts.
-pub type PatternStore = HashMap<PatternId, OptimisedPattern>;
-pub type CellCatalog = HashMap<Cell, u8>;
+pub type PatternStore = HashMap<PatternId, OptimisedPattern, BuildHasherDefault<DefaultHasher>>;
+pub type CellCatalog = HashMap<Cell, u8, BuildHasherDefault<DefaultHasher>>;
 
 fn collect_patterns(song: &Song) -> PatternStore {
     // We duplicate patterns across instrument kinds to allow reasoning on the kinds individually;
@@ -253,7 +256,7 @@ fn collect_patterns(song: &Song) -> PatternStore {
     // copy-on-write semantics, and that kind of sucks.
     // While doing this increases the number of patterns, the later deduplication steps SHOULD bring
     // the numbers down again.
-    let mut patterns = PatternStore::new();
+    let mut patterns = PatternStore::default();
     for order_row in &song.order_matrix {
         for (channel_id, pattern_id) in order_row.iter().cloned().enumerate() {
             patterns

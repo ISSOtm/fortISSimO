@@ -1,12 +1,10 @@
-use std::collections::HashMap;
-
 use crate::song::{EffectId, Song};
 
-use super::{CellFirstHalf, Effect, InstrKind, OptimisedPattern, PatternId};
+use super::{CellFirstHalf, Effect, InstrKind, OptimisedPattern, PatternId, PatternStore};
 
 pub(super) fn mark_reachable_pattern_rows(
     song: &Song,
-    patterns: &mut HashMap<PatternId, OptimisedPattern>,
+    patterns: &mut PatternStore,
 ) -> (u16, u16, u16, u16) {
     let nb_orders = song.order_matrix.len();
     let next_order_idx = |idx| (idx + 1) % nb_orders;
@@ -161,7 +159,7 @@ pub(super) fn mark_reachable_subpattern_rows(
 }
 
 pub(super) fn trim_trailing_unreachable_rows(
-    patterns: &mut HashMap<PatternId, OptimisedPattern>,
+    patterns: &mut PatternStore,
     pruned_patterns: &mut usize,
     pruned_pattern_rows: &mut usize,
     trimmed_rows: &mut usize,
