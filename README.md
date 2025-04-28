@@ -12,7 +12,7 @@ This requires RGBDS 0.9.0 or later.
 
 ## Debugging features
 
-If you're hacking on fortISSimO, you should use an emulator that supported [debugfiles], such as [Emulicious].
+If you're hacking on fortISSimO, you should use an emulator that supports [debugfiles], such as [Emulicious].
 This will enable a lot of runtime checks.
 
 Additionally, since fO stores music data in a fairly oblique way, you can define the variable `FORTISSIMO_LOG` when building (e.g. `rgbasm -DFORTISSIMO_LOG=idx,main_row fortISSimO.asm`) to have some information logged to your emulator's console (again, via debugfiles):
@@ -35,4 +35,4 @@ To follow the license of hUGETracker and hUGEDriver, fortISSimO is dedicated to 
 </p>
 
 [debugfiles]: https://github.com/aaaaaa123456789/gb-debugfiles/blob/master/debugfile.md
-[Enulicious]: https://emulicious.net
+[Emulicious]: https://emulicious.net
