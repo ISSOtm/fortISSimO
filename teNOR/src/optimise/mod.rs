@@ -319,7 +319,7 @@ impl InstrKind {
 #[derive(Debug, Clone)]
 pub struct OptimisedPattern(Vec<AnnotatedCell>);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AnnotatedCell {
     reachable: bool,
     cell: Cell,

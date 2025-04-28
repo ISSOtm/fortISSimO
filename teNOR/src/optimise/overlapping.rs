@@ -103,26 +103,28 @@ impl<'patterns> RowPoolBuilder<'patterns> {
         let first_row = &pattern.0[0];
 
         let mut rows = self.rows();
-        let mut start_row_idx = usize::MAX;
-        'try_somewhere_else: while let Some(cell) = rows.next() {
-            start_row_idx = start_row_idx.wrapping_add(1);
-            if !cell.can_overlap_with(first_row) {
-                continue;
-            }
-
-            // We will want to resume our search later, so we'll keep the original iterator intact.
-            let mut overlappable_rows = rows.clone();
-            let mut row_idx = 1; // We already matched the first row.
-            while let (Some(pattern_row), Some(row)) =
-                (pattern.0.get(row_idx), overlappable_rows.next())
-            {
-                if !pattern_row.can_overlap_with(row) {
-                    continue 'try_somewhere_else;
+        let mut start_row_idx = 0;
+        while let Some(cell) = rows.next() {
+            'try_somewhere_else: {
+                if !cell.can_overlap_with(first_row) {
+                    break 'try_somewhere_else;
                 }
-                row_idx += 1;
+
+                // We will want to resume our search later, so we'll keep the original iterator intact.
+                let mut overlappable_rows = rows.clone();
+                let mut row_idx = 1; // We already matched the first row.
+                while let (Some(pattern_row), Some(row)) =
+                    (pattern.0.get(row_idx), overlappable_rows.next())
+                {
+                    if !pattern_row.can_overlap_with(row) {
+                        break 'try_somewhere_else;
+                    }
+                    row_idx += 1;
+                }
+                // `row_idx` is how many rows we've managed to overlap.
+                return (self.score + row_idx, start_row_idx);
             }
-            // `row_idx` is how many rows we've managed to overlap.
-            return (self.score + row_idx, start_row_idx);
+            start_row_idx += 1;
         }
 
         // Couldn't overlap anything. Too bad!
@@ -237,7 +239,7 @@ pub(super) fn generate_row_pool(
         let (pattern_id, start_ofs) = ordering[idx];
         let rows = &patterns[&pattern_id].0;
 
-        for row in &rows[nb_rows_emitted - start_ofs..] {
+        for (i, row) in rows[nb_rows_emitted - start_ofs..].iter().enumerate() {
             // Check if we need to emit any labels.
             while let Some(&(next_pattern_id, next_start_ofs)) = ordering.get(next_idx) {
                 debug_assert!(next_start_ofs >= nb_rows_emitted); // The ordering is supposed to be sorted this way.
@@ -256,18 +258,31 @@ pub(super) fn generate_row_pool(
                 next_idx += 1;
             }
 
-            if let Some(row) = row.reachable.then_some(row).or_else(|| {
-                // Try finding an overlapping cell that is reachable.
-                ordering[next_idx..]
+            let overlapping_cells = || {
+                ordering[idx..]
                     .iter()
                     .take_while(|&&(_, start_ofs)| start_ofs <= nb_rows_emitted) // The list is sorted by increasing `start_ofs`, so if this is true once, it will remain so.
                     .filter_map(|&(pattern_id, start_ofs)| {
                         // We checked that we aren't past the pattern's beginning, but also check that we aren't past its end.
                         // (This is possible when a pattern is "nested" inside of another.)
-                        patterns[&pattern_id].0.get(nb_rows_emitted - start_ofs)
+                        patterns[&pattern_id]
+                            .0
+                            .get(nb_rows_emitted - start_ofs)
+                            .map(|row| (row, pattern_id))
                     })
-                    .find(|candidate| candidate.reachable)
+            };
+            if let Some(row) = row.reachable.then_some(row).or_else(|| {
+                // Try finding an overlapping cell that is reachable.
+                overlapping_cells()
+                    .find(|(candidate, _)| candidate.reachable)
+                    .map(|(candidate, _)| candidate)
             }) {
+                debug_assert_eq!(
+                    overlapping_cells().find(|(candidate, _)| !row.can_overlap_with(candidate)),
+                    None,
+                    "Does not overlap with {row:?} ({pattern_id:?}[{i}])"
+                );
+
                 nb_saved_bytes += 2; // Each 3-byte cell is replaced with a 1-byte ID.
 
                 let id = *cell_catalog.entry(row.cell).or_insert_with(|| {
