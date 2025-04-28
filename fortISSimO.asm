@@ -499,7 +499,7 @@ TickSubpattern:
 	ld l, [hl]
 	ld a, [wSubpatRowCatalogHigh]
 	ld h, a
-	fO_log subpat_row, "CH\{c,2\} reading subpattern row from $\{hl,04$\}: (\{[hl + 512],2\}, \{[hl + 256],2$\}_\{[hl],2$\})"
+	fO_log subpat_row, "CHx_MASK=\{c\} reading subpattern row from $\{hl,04$\}: (\{[hl + 512],2\}, \{[hl + 256],2$\}_\{[hl],2$\})"
 	; Read the row's FX parameter.
 	ld a, [hl]
 	ldh [hUGE_FxParam], a
