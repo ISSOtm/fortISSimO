@@ -247,11 +247,22 @@ pub(super) fn generate_row_pool(
                     break;
                 }
 
-                // TODO: this is wrong, we'd need to examine the previous pattern.
-                // let overlap_amount = patterns[&next_pattern_id].0.len() - i;
-                let overlap_amount = 0;
-                if overlap_amount != 0 {
-                    output.push(OutputCell::OverlapMarker(overlap_amount));
+                // We know that we aren't overlapiing with any of the patterns before the `idx`th.
+                for prev_idx in (idx..next_idx).rev() {
+                    let (pattern_id, start_ofs) = ordering[prev_idx];
+                    // The offset from the beginning of that pattern.
+                    let ofs_into_pattern = nb_rows_emitted - start_ofs;
+                    // Are we still emitting (overlapping) rows of that pattern? I.e. are we past its end point.
+                    if let Some(overlap_amount) =
+                        patterns[&pattern_id].0.len().checked_sub(ofs_into_pattern)
+                    {
+                        if overlap_amount != 0 {
+                            output.push(OutputCell::OverlapMarker {
+                                nb_rows: overlap_amount,
+                                pattern_id,
+                            });
+                        }
+                    }
                 }
                 output.push(OutputCell::Label(next_pattern_id));
 

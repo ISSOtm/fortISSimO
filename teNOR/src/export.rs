@@ -133,11 +133,21 @@ pub(super) fn export(
                     .unwrap();
                     row_idx += 1;
                 }
-                OutputCell::OverlapMarker(1) => {
-                    write!(output, "\n\t; Continued on next row.").unwrap();
+                OutputCell::OverlapMarker {
+                    nb_rows: 1,
+                    pattern_id,
+                } => {
+                    write!(output, "\n\t; {pattern_id} continues on next row.").unwrap();
                 }
-                OutputCell::OverlapMarker(how_many) => {
-                    write!(output, "\n\t; Continued on next {how_many} rows.").unwrap();
+                OutputCell::OverlapMarker {
+                    nb_rows,
+                    pattern_id,
+                } => {
+                    write!(
+                        output,
+                        "\n\t; {pattern_id} continues on next {nb_rows} rows."
+                    )
+                    .unwrap();
                 }
             }
         }

@@ -243,7 +243,10 @@ impl OptimStats {
 pub enum OutputCell {
     Label(PatternId),
     Cell(u8),
-    OverlapMarker(usize),
+    OverlapMarker {
+        nb_rows: usize,
+        pattern_id: PatternId,
+    },
 }
 
 /// Convenience shortcuts.
