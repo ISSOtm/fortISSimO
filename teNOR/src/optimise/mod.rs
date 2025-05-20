@@ -1,6 +1,6 @@
 use std::{
-    collections::HashMap,
-    hash::{BuildHasherDefault, DefaultHasher, Hash},
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{BuildHasherDefault, Hash},
 };
 
 use crate::{
