@@ -207,7 +207,7 @@ impl<'builder, 'patterns: 'builder> Iterator for RowsIter<'builder, 'patterns> {
             .builder
             .ordering
             .get(self.ordering_idx)
-            .map_or(false, check_past_end)
+            .is_some_and(check_past_end)
         {
             // Gone over the end of `pattern`, switch to the next one.
             self.ordering_idx += 1;
